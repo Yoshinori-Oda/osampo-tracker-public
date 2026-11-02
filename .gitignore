@@ -1,0 +1,24 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+*.iml
+
+# backend (Python)
+# 秘密情報を含むのでコミットしない (項目は backend/docs/バックエンド構成.md)
+backend/.env
+# アクセストークンを署名するES256の鍵のペア
+backend/secrets/
+backend/.venv/
+backend/host_check_logs/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Claude Code
+# git worktree での作業場所
+.claude/worktrees/
+# 個人ごとの Claude Code 設定 (共有する設定は .claude/settings.json に書く)
+.claude/settings.local.json

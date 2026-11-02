@@ -1,0 +1,127 @@
+# DBの接続情報は同じディレクトリの.env(コミットしない)から読み込む。項目はbackend/docs/バックエンド構成.mdを参照。
+# 各サービスには必要な接続情報だけを渡す(例: workerにはマイグレーション用のロールを渡さない)
+
+# ログはDockerのjson-fileに溜まるので、ファイルの大きさと数に上限を付ける(既定では無制限に増える)
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: location_postgis
+    platform: linux/amd64
+    environment:
+      # 管理用のスーパーユーザー(拡張機能とロールの作成にだけ使う)
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # 以下は初回起動時のスクリプト(db/init/)が使う
+      POSTGRES_TEST_DB: ${POSTGRES_TEST_DB}
+      MIGRATOR_DB_USER: ${MIGRATOR_DB_USER}
+      MIGRATOR_DB_PASSWORD: ${MIGRATOR_DB_PASSWORD}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      WORKER_DB_USER: ${WORKER_DB_USER}
+      WORKER_DB_PASSWORD: ${WORKER_DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      # ディレクトリごとマウントするとイメージの10_postgis.shが隠れるので、ファイル単位でマウントする
+      - ./db/init/20_roles_and_databases.sh:/docker-entrypoint-initdb.d/20_roles_and_databases.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+
+  api:
+    build: .
+    # アクセスログはアプリ(app/request_context.py)が出すので、uvicorn標準のものは止める
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload", "--no-access-log"]
+    environment:
+      # ログの形式(text・json)とレベル。項目はbackend/docs/バックエンド構成.mdの「ログ」
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_TEST_DB: ${POSTGRES_TEST_DB}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      # マイグレーション(docker compose run --rm api alembic ...)はこのサービスで実行する
+      MIGRATOR_DB_USER: ${MIGRATOR_DB_USER}
+      MIGRATOR_DB_PASSWORD: ${MIGRATOR_DB_PASSWORD}
+      # workerのロール。マイグレーション(ポリシー・権限の対象のロール名)と、pytest(workerの権限の確認)で使う
+      WORKER_DB_USER: ${WORKER_DB_USER}
+      WORKER_DB_PASSWORD: ${WORKER_DB_PASSWORD}
+      PURGE_RETENTION_DAYS: ${PURGE_RETENTION_DAYS:-90}
+      # メールアドレスの確認コード(省略可)。項目はbackend/docs/バックエンド構成.mdの「メールアドレスの確認コード」
+      EMAIL_CODE_TTL_MINUTES: ${EMAIL_CODE_TTL_MINUTES:-10}
+      EMAIL_CODE_MAX_FAILED_ATTEMPTS: ${EMAIL_CODE_MAX_FAILED_ATTEMPTS:-5}
+      EMAIL_CODE_RESEND_INTERVAL_SECONDS: ${EMAIL_CODE_RESEND_INTERVAL_SECONDS:-60}
+      EMAIL_CODE_DAILY_LIMIT: ${EMAIL_CODE_DAILY_LIMIT:-5}
+    ports:
+      - "8080:8080"
+    volumes:
+      # 開発中はソースコードをbind mountし、--reloadで変更を反映する
+      - ./app:/app/app
+      - ./tests:/app/tests
+      - ./migrations:/app/migrations
+      # アクセストークン(JWT)を署名するES256の鍵のペア。コミットしない(backend/secrets/は.gitignore済み)
+      - ./secrets:/app/secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging: *default-logging
+
+  # apiと同じイメージで起動コマンドだけを変える。ジョブが重複しないよう1つだけ起動する
+  worker:
+    build: .
+    command: ["python", "-m", "app.worker"]
+    environment:
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # apiのロールではなく、ジョブで使うテーブル・操作だけの権限を持つworker用のロールで接続する
+      WORKER_DB_USER: ${WORKER_DB_USER}
+      WORKER_DB_PASSWORD: ${WORKER_DB_PASSWORD}
+      PURGE_RETENTION_DAYS: ${PURGE_RETENTION_DAYS:-90}
+      PURGE_INTERVAL_HOURS: ${PURGE_INTERVAL_HOURS:-24}
+      # メール送信(apiはoutboxに積むだけなので、SMTPの設定はworkerにだけ渡す)。既定はmailpit。項目はbackend/docs/バックエンド構成.md
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      MAIL_FROM: "${MAIL_FROM:-osampo-tracker <no-reply@osampo-tracker.local>}"
+      MAIL_POLL_INTERVAL_SECONDS: ${MAIL_POLL_INTERVAL_SECONDS:-5}
+      MAIL_MAX_ATTEMPTS: ${MAIL_MAX_ATTEMPTS:-5}
+      OUTBOX_RETENTION_DAYS: ${OUTBOX_RETENTION_DAYS:-90}
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    restart: unless-stopped
+    logging: *default-logging
+
+  # 開発用のSMTP受信サーバー。送信したメールはhttp://localhost:8025で確認できる(外部には送らない)。
+  # SMTPはcomposeの中(mailpit:1025)からだけ使うので、ホストには公開しない
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+
+volumes:
+  postgis_data:

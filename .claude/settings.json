@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git worktree *)",
+      "Bash(git branch *)",
+      "WebFetch(domain:code.claude.com)"
+    ]
+  }
+}
