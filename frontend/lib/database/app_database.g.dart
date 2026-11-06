@@ -2063,14 +2063,19 @@ class $$UsersTableTableManager
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (sessionsRefs)
-                    await $_getPrefetchedData<User, $UsersTable, Session>(
+                    await $_getPrefetchedDataByColumns<
+                      User,
+                      $UsersTable,
+                      Session,
+                      $SessionsTable
+                    >(
                       currentTable: table,
                       referencedTable: $$UsersTableReferences
                           ._sessionsRefsTable(db),
                       managerFromTypedResult: (p0) =>
                           $$UsersTableReferences(db, table, p0).sessionsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.userId == item.id),
+                      currentColumn: 'id',
+                      referencedColumn: 'user_id',
                       typedResults: items,
                     ),
                 ];
@@ -2648,10 +2653,11 @@ class $$SessionsTableTableManager
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (trackPointsRefs)
-                    await $_getPrefetchedData<
+                    await $_getPrefetchedDataByColumns<
                       Session,
                       $SessionsTable,
-                      TrackPoint
+                      TrackPoint,
+                      $TrackPointsTable
                     >(
                       currentTable: table,
                       referencedTable: $$SessionsTableReferences
@@ -2661,8 +2667,8 @@ class $$SessionsTableTableManager
                         table,
                         p0,
                       ).trackPointsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.sessionId == item.id),
+                      currentColumn: 'id',
+                      referencedColumn: 'session_id',
                       typedResults: items,
                     ),
                 ];
