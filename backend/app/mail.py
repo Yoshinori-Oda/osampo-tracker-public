@@ -5,6 +5,7 @@ DBには触れない(outboxの業務ルールはapp/services/mail_service.py)。
 
 import asyncio
 import smtplib
+import ssl
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid, parseaddr
 
@@ -63,7 +64,9 @@ def _send_sync(message: EmailMessage) -> None:
         settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds
     ) as smtp:
         if settings.smtp_starttls:
-            smtp.starttls()
+            # contextを渡さないと、Pythonの既定では証明書とホスト名を検証しない(経路上で認証情報・メールを盗み見られる)。
+            # 検証に失敗したらssl.SSLCertVerificationError(OSError)になり、一時的な失敗として再送しつつログで気づく
+            smtp.starttls(context=ssl.create_default_context())
         if settings.smtp_username and settings.smtp_password:
             smtp.login(settings.smtp_username, settings.smtp_password.get_secret_value())
         smtp.send_message(message)

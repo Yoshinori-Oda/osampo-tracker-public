@@ -4,8 +4,10 @@
 """
 
 import smtplib
+import ssl
 from datetime import timedelta
 from email.message import EmailMessage
+from typing import ClassVar, Self
 
 import pytest
 from sqlalchemy import func, select
@@ -237,6 +239,8 @@ async def test_deleting_user_deletes_their_emails(db_session: AsyncSession, user
         (ConnectionRefusedError(111, "Connection refused"), TemporaryMailError),
         (smtplib.SMTPServerDisconnected("closed"), TemporaryMailError),
         (TimeoutError("timed out"), TemporaryMailError),
+        # STARTTLSで証明書の検証に失敗した: 設定の誤りか経路上の攻撃なので、送らずに再送しつつログで気づく
+        (ssl.SSLCertVerificationError("certificate verify failed"), TemporaryMailError),
     ],
 )
 def test_classify_smtp_error(exc: Exception, expected: type[Exception]):
@@ -251,3 +255,64 @@ async def test_send_via_smtp_raises_classified_error(monkeypatch: pytest.MonkeyP
 
     with pytest.raises(PermanentMailError):
         await mail.send_via_smtp(mail.build_message("a@example.com", "件名", "本文"))
+
+
+# ---- SMTPへの接続(STARTTLS) ------------------------------------------------------------
+
+
+class FakeSMTP:
+    """smtplib.SMTPの代わりに、呼ばれた操作を記録する。"""
+
+    instances: ClassVar[list["FakeSMTP"]] = []
+
+    def __init__(self, host: str, port: int, timeout: float) -> None:
+        self.starttls_contexts: list[ssl.SSLContext | None] = []
+        self.sent: list[EmailMessage] = []
+        FakeSMTP.instances.append(self)
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        pass
+
+    def starttls(self, context: ssl.SSLContext | None = None) -> None:
+        self.starttls_contexts.append(context)
+
+    def login(self, user: str, password: str) -> None:
+        pass
+
+    def send_message(self, message: EmailMessage) -> None:
+        self.sent.append(message)
+
+
+@pytest.fixture
+def fake_smtp(monkeypatch: pytest.MonkeyPatch) -> type[FakeSMTP]:
+    FakeSMTP.instances = []
+    monkeypatch.setattr(mail.smtplib, "SMTP", FakeSMTP)
+    return FakeSMTP
+
+
+def test_starttls_verifies_certificate_and_hostname(
+    monkeypatch: pytest.MonkeyPatch, fake_smtp: type[FakeSMTP]
+):
+    monkeypatch.setattr(mail.settings, "smtp_starttls", True)
+
+    mail._send_sync(mail.build_message("a@example.com", "件名", "本文"))
+
+    (smtp,) = fake_smtp.instances
+    (context,) = smtp.starttls_contexts
+    assert context is not None
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True
+    assert len(smtp.sent) == 1
+
+
+def test_no_starttls_when_disabled(monkeypatch: pytest.MonkeyPatch, fake_smtp: type[FakeSMTP]):
+    monkeypatch.setattr(mail.settings, "smtp_starttls", False)
+
+    mail._send_sync(mail.build_message("a@example.com", "件名", "本文"))
+
+    (smtp,) = fake_smtp.instances
+    assert smtp.starttls_contexts == []
+    assert len(smtp.sent) == 1
