@@ -19,6 +19,8 @@ permissions:
   contents: read
 
 # アクションは改ざんされないよう、タグではなくコミットのSHAで固定する(更新は.github/dependabot.yml)
+# チェックのステップは、前のチェックが失敗しても実行する(1回の実行で全ての問題が分かるように。run_checks.shと同じ)。
+# ただし前提のステップ(依存のインストール・マイグレーション)が失敗したら、それを使うステップは実行しない
 jobs:
   backend:
     runs-on: ubuntu-24.04
@@ -81,21 +83,27 @@ jobs:
 
       # --locked: uv.lockがpyproject.tomlと食い違っていたら失敗する
       - name: Install dependencies
+        id: deps
         run: uv sync --locked
 
       - name: Lint (ruff)
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: uv run ruff check .
 
       - name: Migrate (development and test databases)
+        id: migrate
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: |
           uv run alembic upgrade head
           uv run alembic -x db=test upgrade head
 
       # モデルとマイグレーションで作ったスキーマに差分が無いことを確かめる
       - name: Check migrations (alembic check)
+        if: ${{ !cancelled() && steps.migrate.outcome == 'success' }}
         run: uv run alembic check
 
       - name: Test (pytest)
+        if: ${{ !cancelled() && steps.migrate.outcome == 'success' }}
         run: uv run pytest -v -rfE
 
   frontend:
@@ -119,23 +127,30 @@ jobs:
 
       # --enforce-lockfile: pubspec.lockがpubspec.yamlと食い違っていたら失敗する
       - name: Install dependencies
+        id: deps
         run: flutter pub get --enforce-lockfile
 
       # コミット済みのコード生成物(Driftの*.g.dart等)が最新かを確かめる。
-      # 差分が出たら、ホストでrun_checks.shのcodegenを実行し、生成物をコミットし直す
+      # 差分が出たら、ホストでrun_checks.shのcodegenを実行し、生成物をコミットし直す。
+      # 後のanalyze・testがコミットされた内容を検査するよう、失敗したときは生成し直したファイルを元に戻す
       - name: Check generated code is up to date
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: |
           dart run build_runner build --delete-conflicting-outputs
           if [ -n "$(git status --porcelain -- .)" ]; then
             echo "::error::コード生成物がコミットされた内容と異なります。run_checks.sh <run_id> codegen を実行してコミットしてください"
             git status --porcelain -- .
             git diff -- .
+            git checkout -- .
+            git clean -fdq -- .
             exit 1
           fi
 
       # run_checks.shと同じ基準(infoだけでは失敗にしない)
       - name: Analyze
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: flutter analyze --no-fatal-infos
 
       - name: Test
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: flutter test
