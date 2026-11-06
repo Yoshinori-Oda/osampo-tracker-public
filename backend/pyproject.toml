@@ -38,3 +38,7 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint]
+# タイムゾーンなしの日時(datetime.now()等)を指摘する。ruff 0.17で既定のルールから一部が外れたので、明示して全て有効にする
+extend-select = ["DTZ"]

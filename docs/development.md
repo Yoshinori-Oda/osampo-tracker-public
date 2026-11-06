@@ -88,7 +88,7 @@
 
 ### コーディング規約
 
-- 現状はlinterは未導入(frontend)。backendはruffの既定のルール
+- 現状はlinterは未導入(frontend)。backendはruffの既定のルールに、DTZ(タイムゾーンなしの日時の指摘)を加えたもの(`pyproject.toml`の`[tool.ruff.lint]`)
 - Dartのインデントは2文字、SQLのインデントは4文字で行い、Dartではリスト項目の末尾にも`,`を入れる
 - 端末のログは`utils/app_log.dart`の`appLog`で出す(`print`は使わない)
 
