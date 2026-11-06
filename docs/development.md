@@ -155,6 +155,8 @@
 - 1PR1目的を基本とし、無関係な変更を混在させない
 - mainへの直接のpushは禁止。ブランチをpushしてPRを作り、CIが通ってからマージする。CIで見つかった問題は同じブランチに
   修正のコミットを足して直す
+- マージはmerge commit(`gh pr merge --merge`)を基本とし、PRの中の個々のコミットを残す。squash・rebaseも設定上は許可している。
+  PR単位の履歴は`git log --first-parent main`で見る
 - `frontend/pubspec.lock`はコミット対象(Flutterはアプリについてはlockをコミットするのが公式推奨)。
   `flutter analyze`等の実行で無関係な依存バージョンの差分が紛れ込むことがあるので、
   意図しない変更はコミット前に`git checkout`で戻す
