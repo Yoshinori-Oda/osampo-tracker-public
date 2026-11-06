@@ -1,0 +1,38 @@
+# 依存パッケージのバージョン更新のPRを、月1回・種類ごとに1つのPRにまとめて作る。PRにもCIが走るので、通ればマージする。
+# 脆弱性への対応(セキュリティ更新)は、リポジトリの設定で有効にしていれば、この頻度と関係なく届く
+version: 2
+updates:
+  # .github/workflows/のアクション。SHAで固定したものも、SHAと横のバージョンのコメントをまとめて更新する
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  # backend(uv.lock)
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: monthly
+    groups:
+      backend:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+      include: scope
+
+  # frontend(pubspec.lock)。Flutter本体のバージョンは対象外(.github/workflows/ci.ymlとホストで手で上げる)
+  - package-ecosystem: pub
+    directory: /frontend
+    schedule:
+      interval: monthly
+    groups:
+      frontend:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+      include: scope

@@ -1,0 +1,141 @@
+# push(main)・PRごとに、backend(ruff・マイグレーション・alembic check・pytest)とfrontend(コード生成物の確認・analyze・test)を
+# 並列に実行する。E2E(シミュレータが要る)はホストのfrontend/scripts/run_checks.shで行う。詳細はdocs/development.mdの「CI」
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Actionsのタブから手動でも実行できるようにする
+  workflow_dispatch:
+
+# 同じPRで新しくpushしたら、古い実行を取り消す(mainは全コミットを確かめるので取り消さない)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# ワークフローが受け取るGITHUB_TOKENは、リポジトリの読み取りだけにする
+permissions:
+  contents: read
+
+# アクションは改ざんされないよう、タグではなくコミットのSHAで固定する(更新は.github/dependabot.yml)
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    # CI専用の使い捨てのDB。パスワードは秘密情報ではないので、ダミーの値を直接書く
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_DB: location_db
+      POSTGRES_TEST_DB: location_db_test
+      MIGRATOR_DB_USER: osampo_migrator
+      MIGRATOR_DB_PASSWORD: ci-migrator-password
+      APP_DB_USER: osampo_app
+      APP_DB_PASSWORD: ci-app-password
+      WORKER_DB_USER: osampo_worker
+      WORKER_DB_PASSWORD: ci-worker-password
+    services:
+      # ジョブのステップより先に起動し、ヘルスチェックが通るまでステップは待つ
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-postgres-password
+          # サービスの設定ではenvコンテキストを参照できないので、上のジョブのenvと同じ値を直接書く
+          POSTGRES_DB: location_db
+          # 以下はdb/init/20_roles_and_databases.shが使う(下のステップでコンテナの中で実行する)
+          POSTGRES_TEST_DB: location_db_test
+          MIGRATOR_DB_USER: osampo_migrator
+          MIGRATOR_DB_PASSWORD: ci-migrator-password
+          APP_DB_USER: osampo_app
+          APP_DB_PASSWORD: ci-app-password
+          WORKER_DB_USER: osampo_worker
+          WORKER_DB_PASSWORD: ci-worker-password
+        ports:
+          - 5432:5432
+        # TCP(-h localhost)で確かめる。ソケットでは、初回の初期化中の仮のサーバーにも準備完了と答えてしまう
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # サービスコンテナはチェックアウトより先に起動するので、composeのように初期化のスクリプトをマウントできない。
+      # 起動後にコンテナの中で実行する(ロール・テスト用データベース・拡張機能・権限。composeと同じスクリプト)
+      - name: Initialize database roles and test database
+        run: docker exec -i "${{ job.services.db.id }}" bash < db/init/20_roles_and_databases.sh
+
+      # Dockerfile(python:3.12-slim)と同じPythonのバージョンにする
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          working-directory: backend
+
+      # --locked: uv.lockがpyproject.tomlと食い違っていたら失敗する
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Migrate (development and test databases)
+        run: |
+          uv run alembic upgrade head
+          uv run alembic -x db=test upgrade head
+
+      # モデルとマイグレーションで作ったスキーマに差分が無いことを確かめる
+      - name: Check migrations (alembic check)
+        run: uv run alembic check
+
+      - name: Test (pytest)
+        run: uv run pytest -v -rfE
+
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # ホストと同じバージョンに固定する。ホストのFlutterを上げたら、ここも同じPRで上げる
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+          pub-cache: true
+
+      # --enforce-lockfile: pubspec.lockがpubspec.yamlと食い違っていたら失敗する
+      - name: Install dependencies
+        run: flutter pub get --enforce-lockfile
+
+      # コミット済みのコード生成物(Driftの*.g.dart等)が最新かを確かめる。
+      # 差分が出たら、ホストでrun_checks.shのcodegenを実行し、生成物をコミットし直す
+      - name: Check generated code is up to date
+        run: |
+          dart run build_runner build --delete-conflicting-outputs
+          if [ -n "$(git status --porcelain -- .)" ]; then
+            echo "::error::コード生成物がコミットされた内容と異なります。run_checks.sh <run_id> codegen を実行してコミットしてください"
+            git status --porcelain -- .
+            git diff -- .
+            exit 1
+          fi
+
+      # run_checks.shと同じ基準(infoだけでは失敗にしない)
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test

@@ -1,5 +1,7 @@
 # osampo-tracker
 
+[![CI](https://github.com/Yoshinori-Oda/osampo-tracker-public/actions/workflows/ci.yml/badge.svg)](https://github.com/Yoshinori-Oda/osampo-tracker-public/actions/workflows/ci.yml)
+
 散歩・ランニングなどの移動を記録するモバイルアプリと、そのバックエンドです。
 収録中は数秒おきに現在位置を端末に記録し、地図上の軌跡・距離・時間・高度として振り返れます。
 記録はサーバーと同期し、同じアカウントの別の端末からも見られます。
@@ -77,14 +79,16 @@ flowchart LR
 | モバイルアプリ | Dart / Flutter、Riverpod、Drift(SQLite)、geolocator、flutter_map、fl_chart、flutter_secure_storage |
 | APIサーバー | Python 3.12 / FastAPI、Pydantic、SQLAlchemy 2(非同期)+ psycopg 3、GeoAlchemy2、PyJWT、pwdlib(Argon2)、APScheduler |
 | DB | PostgreSQL 16 + PostGIS、Alembic(マイグレーション) |
-| テスト・品質 | flutter_test・integration_test(E2E)、pytest、ruff |
+| テスト・品質 | flutter_test・integration_test(E2E)、pytest、ruff、GitHub Actions(CI)、Dependabot |
 | 開発環境 | Docker Compose、uv、devcontainer、Claude Code |
 
 ## 開発の進め方
 
 - **設計 → 実装 → テストを1機能ずつ**: 機能ごとに設計書を書いてから実装し、テストを揃えてmainに取り込みます。設計を変えたら同じ変更で設計書も更新しています
 - **AIコーディングエージェントとの協働**: Claude Codeを、ホストのファイルや外部への通信を制限したdevcontainerの中で動かしています。設計の判断とレビューは自分で行い、実装とテストの作成をエージェントと分担しています
-- **ホストでの検証をログで受け渡す仕組み**: コンテナの中にはFlutter SDKもDockerも入れていないため、解析・テスト・E2Eはホストで実行します。`run_checks.sh`が結果のサマリー・ログ・スクリーンショットをファイルに残し、それを読んで修正する流れにしています
+- **ホストでの検証をログで受け渡す仕組み**: コンテナの中にはFlutter SDKもDockerも入れていないため、E2Eやpush前の確認はホストで実行します。`run_checks.sh`が結果のサマリー・ログ・スクリーンショットをファイルに残し、それを読んで修正する流れにしています
+- **CI**: GitHub Actionsで、PRごとにbackend(lint・マイグレーション・スキーマの差分確認・PostGISのサービスコンテナに対するpytest)と
+  frontend(コード生成物の確認・静的解析・テスト)を並列に実行し、通ったものだけをmainにマージしています。E2Eはシミュレータが要るためホストで実行します
 - **テスト**: frontendはユニット/ウィジェットテストと、`flutter drive`によるE2E(スクリーンショット付き)。backendは実DB(テスト用データベース)に対するpytestで、テストごとにトランザクションをロールバックします
 
 ## ドキュメント

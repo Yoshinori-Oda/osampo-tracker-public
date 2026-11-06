@@ -15,9 +15,13 @@
   - 結果はファイル(`host_check_logs/`)に残るので、コンテナ側からは出力を貼り付けてもらわなくても`SUMMARY.md`・各ログ・
     スクリーンショットを読んで修正できる
 - Driftの`*.g.dart`などコード生成物もホスト側の`build_runner`で更新する(`run_checks.sh <run_id> codegen`)
+- push・PRごとに、E2E以外のチェック(backendのlint・マイグレーション・pytest、frontendのコード生成物の確認・analyze・test)を
+  GitHub ActionsのCIで実行する(下記「CI」)。ホストの`run_checks.sh`は、E2E・画面の確認、コミットするファイルを作る処理
+  (`codegen`・`lock`)、push前に手元で確かめたいときに使う
 
 ## ディレクトリ構成
 
+- .github: GitHub Actionsのワークフロー(`workflows/ci.yml`)とDependabotの設定(`dependabot.yml`)。下記「CI」
 - backend: Dockerで動かすバックエンド(FastAPIのapi + 定期実行のworker + PostgreSQL)
   - app/: FastAPIのアプリ本体(config.py: 設定、db.py: DB接続、main.py: アプリ、worker.py: 定期実行、
     logging_config.py・request_context.py: ログの形式とリクエストID・アクセスログ、security.py: パスワードのハッシュ・トークン、
@@ -123,6 +127,24 @@
     pytestの失敗一覧と詳細、失敗したstepのログ末尾)をまず読む
   - 前提: `backend/.env`があり、`up`以外のstepはサービスが起動済みであること
 
+### CI
+
+- `.github/workflows/ci.yml`。mainへのpush・PR・手動実行(Actionsのタブ)で、`backend`と`frontend`の2つのジョブを並列に実行する。
+  mainへはPR経由でしか入れず、2つのジョブが通らないとマージできない(GitHubのルールセットで設定)
+  - `backend`: PostGISのサービスコンテナを起動し、composeと同じ`db/init/20_roles_and_databases.sh`をコンテナの中で実行して
+    ロール・テスト用データベースを作る。ランナー上のuv(Python 3.12)で`uv sync --locked` → `ruff check` →
+    `alembic upgrade head`(開発用・テスト用) → `alembic check` → `pytest`。APIはpytestの中でアプリを直接呼び、workerはジョブの関数を
+    直接呼ぶので、api・worker・mailpitのコンテナは起動しない(Dockerfileでのビルドと起動は確かめていない)
+  - `frontend`: Flutterのバージョンはホストと同じ値に固定する(ホストのFlutterを上げたら、`ci.yml`の`flutter-version`も同じPRで上げる)。
+    `flutter pub get --enforce-lockfile` → `build_runner`を実行してコミット済みの生成物と差分が無いかの確認 →
+    `flutter analyze --no-fatal-infos` → `flutter test`
+- `uv sync --locked`・`pub get --enforce-lockfile`は、lockファイルが`pyproject.toml`・`pubspec.yaml`と食い違っていると失敗する。
+  依存パッケージを変えたら、ホストで`lock`(backend)・`pubget`(frontend)を実行してlockファイルもコミットする
+- 生成物の確認で失敗したら、ホストで`run_checks.sh <run_id> codegen`を実行して生成物をコミットする
+- CIのDBの接続情報は使い捨てのダミーの値で、`ci.yml`に直接書いている(秘密情報ではない)
+- アクションはタグではなくコミットのSHAで固定する(タグは付け替えられるため)。更新は`.github/dependabot.yml`の
+  バージョン更新(月1回、アクション・uv・pubの種類ごとに1つのPR)で行い、CIが通ればマージする
+
 ### git
 
 - 作業はブランチを切って行い、並行する作業はgit worktree(`.claude/worktrees/<作業名>/`。`.gitignore`済み)で分ける。
@@ -131,6 +153,8 @@
   同じプロジェクト名(`backend`)になるので、メインのチェックアウトとworktreeで同時に起動しない
 - commitメッセージはConventional Commitsに従う
 - 1PR1目的を基本とし、無関係な変更を混在させない
+- mainへの直接のpushは禁止。ブランチをpushしてPRを作り、CIが通ってからマージする。CIで見つかった問題は同じブランチに
+  修正のコミットを足して直す
 - `frontend/pubspec.lock`はコミット対象(Flutterはアプリについてはlockをコミットするのが公式推奨)。
   `flutter analyze`等の実行で無関係な依存バージョンの差分が紛れ込むことがあるので、
   意図しない変更はコミット前に`git checkout`で戻す
