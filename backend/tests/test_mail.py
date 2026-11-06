@@ -7,6 +7,7 @@ import smtplib
 import ssl
 from datetime import timedelta
 from email.message import EmailMessage
+from typing import ClassVar, Self
 
 import pytest
 from sqlalchemy import func, select
@@ -262,14 +263,14 @@ async def test_send_via_smtp_raises_classified_error(monkeypatch: pytest.MonkeyP
 class FakeSMTP:
     """smtplib.SMTPの代わりに、呼ばれた操作を記録する。"""
 
-    instances: list["FakeSMTP"] = []
+    instances: ClassVar[list["FakeSMTP"]] = []
 
     def __init__(self, host: str, port: int, timeout: float) -> None:
         self.starttls_contexts: list[ssl.SSLContext | None] = []
         self.sent: list[EmailMessage] = []
         FakeSMTP.instances.append(self)
 
-    def __enter__(self) -> "FakeSMTP":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
