@@ -138,6 +138,8 @@
   - `frontend`: Flutterのバージョンはホストと同じ値に固定する(ホストのFlutterを上げたら、`ci.yml`の`flutter-version`も同じPRで上げる)。
     `flutter pub get --enforce-lockfile` → `build_runner`を実行してコミット済みの生成物と差分が無いかの確認 →
     `flutter analyze --no-fatal-infos` → `flutter test`
+- チェックのステップは、前のチェックが失敗しても実行する(`if: ${{ !cancelled() && ... }}`。1回の実行で全ての問題が分かるように)。
+  ただし前提のステップ(依存のインストール、backendのマイグレーション)が失敗したら、それを使うステップは実行しない
 - `uv sync --locked`・`pub get --enforce-lockfile`は、lockファイルが`pyproject.toml`・`pubspec.yaml`と食い違っていると失敗する。
   依存パッケージを変えたら、ホストで`lock`(backend)・`pubget`(frontend)を実行してlockファイルもコミットする
 - 生成物の確認で失敗したら、ホストで`run_checks.sh <run_id> codegen`を実行して生成物をコミットする
