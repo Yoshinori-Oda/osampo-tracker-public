@@ -11,6 +11,7 @@ import '../models/recording_session.dart';
 import '../models/move_method.dart';
 import '../models/location_banner.dart';
 import '../models/recording_phase.dart';
+import '../utils/app_log.dart';
 import '../utils/save_or_discard_screen.dart';
 import '../utils/delete_conflict_dialog.dart' show navigatorKey, scaffoldMessengerKey;
 import '../utils/duration_format.dart';
@@ -39,6 +40,8 @@ class TrackingService {
   static const Duration _startFreshPositionTimeout = Duration(seconds: 5);
   // startRecording: この時間を超えて古い位置情報はフォールバックとして使わずブロックする
   static const Duration _startFallbackAgeLimit = Duration(seconds: 15);
+  // stopRecording: 終了地点の取得のtimeout(収録開始と同じ。保存/破棄画面を開いた後に裏で待つ)
+  static const Duration _finalPositionTimeout = _startFreshPositionTimeout;
 
   StreamSubscription<Position>? _positionStreamSubscription;
   // 現在の購読がバックグラウンド継続用の設定(buildPositionStreamSettings(background: true))かどうか
@@ -57,6 +60,8 @@ class TrackingService {
 
   RecordingSession? _session;
   Timer? _timer;
+  // 収録停止後に裏で取得している終了地点の追加(セッションIDごと)。保存/破棄のDB反映はこれの完了を待つ
+  final Map<String, Future<void>> _finalPointFetches = {};
   Timer? _bannerWatchdogTimer;
 
   // 起動時リカバリで見つかった、まだ保存/破棄していないセッションのキュー(先頭から順に_sessionへ積む)
@@ -756,49 +761,49 @@ class TrackingService {
   }
 
   // stop recording
-  // 戻り値: null=最終ポイントの取得を試みなかった、true=取得できた、false=取得を試みたが失敗した
-  Future<bool?> stopRecording({bool skipFinalPositionFetch = false}) async {
-    if (!isRecording) return null;
+  // 終了地点の取得は待たずに戻る(保存/破棄画面をすぐに開けるように)。取得は裏で行い、
+  // 取れたらトラックポイントとして追加する(取れなければそれまでの記録のまま)
+  Future<void> stopRecording({bool skipFinalPositionFetch = false}) async {
+    if (!isRecording) return;
     _setPhase(RecordingPhase.stopping);
+
+    // 終了地点の取得を待つ間に経過時間・トラックポイントが増えないよう、先にタイマーを止める
+    _timer?.cancel();
+    _timer = null;
 
     // end session
     final now = DateTime.now();
     _session = _session!.copyWith(endedAt: now);
 
     // record final point (位置情報が失われた状態からの強制停止時は取得を試みない)
-    bool? finalPointFetched;
     if (!skipFinalPositionFetch && _session!.elapsedSeconds % 5 != 0) {
-      try {
-        final currentPosition = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 1)
-          )
-        );
-        _currentPositionController.add(currentPosition);
-        _lastPosition = currentPosition;
-
-        await _repo.addTrackPoint(
-          sessionId: _session!.sessionId,
-          latitude: currentPosition.latitude,
-          longitude: currentPosition.longitude,
-          altitude: currentPosition.altitude,
-          recordedAt: now
-        );
-        finalPointFetched = true;
-      } catch (_) {
-        // 終了地点の位置情報が取得できなくても、それまでの記録を失わないよう
-        // 最終ポイントの追加だけをスキップしてそのまま停止処理を続ける
-        finalPointFetched = false;
-      }
+      final sessionId = _session!.sessionId;
+      final fetch = _addFinalPoint(sessionId: sessionId, recordedAt: now);
+      _finalPointFetches[sessionId] = fetch;
+      unawaited(fetch.whenComplete(() => _finalPointFetches.remove(sessionId)));
     }
+  }
 
-    // stop the timer
-    _timer?.cancel();
-    _timer = null;
-
-    // stop recording
-    return finalPointFetched;
+  Future<void> _addFinalPoint({required String sessionId, required DateTime recordedAt}) async {
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: _finalPositionTimeout
+        )
+      );
+      if (_disposed) return;
+      await _repo.addTrackPoint(
+        sessionId: sessionId,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        altitude: position.altitude,
+        recordedAt: recordedAt
+      );
+    } catch (e) {
+      // 終了地点が取れなくても、それまでの記録を失わないよう最終ポイントの追加だけをスキップする
+      appLog('tracking', 'final point skipped', error: e);
+    }
   }
 
   // complete session by save/discard
@@ -825,6 +830,10 @@ class TrackingService {
       _setPhase(RecordingPhase.idle);
       _recordingSessionController.add(recordingSession);
     }
+
+    // 終了地点の取得中なら、その追加を待ってから反映する(保存では終了地点も含めて同期し、
+    // 破棄では削除した後に終了地点が書き込まれないようにする)
+    await _finalPointFetches[session.sessionId];
 
     if (doSave) {
       // save

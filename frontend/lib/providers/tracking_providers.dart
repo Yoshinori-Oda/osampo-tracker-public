@@ -90,9 +90,9 @@ final sessionByIdProvider = StreamProvider.family<Session, String>((ref, session
   return db.getSessionById(sessionId);
 });
 
-final trackPointsBySessionIdProvider = FutureProvider.family<List<TrackPoint>, String>((ref, sessionId) {
+final trackPointsBySessionIdProvider = StreamProvider.family<List<TrackPoint>, String>((ref, sessionId) {
   final db = ref.watch(databaseProvider);
-  return db.getTrackPointsForSession(sessionId);
+  return db.watchTrackPointsForSession(sessionId);
 });
 
 // for recording view
