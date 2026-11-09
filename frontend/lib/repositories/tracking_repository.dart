@@ -71,11 +71,12 @@ class TrackingRepository {
   bool get isSchedulingRetry => _retryTimer != null;
   bool isSyncing = false;
 
-  // APIの接続先。実機・Androidエミュレータからはlocalhostに届かないので、
-  // `flutter run --dart-define=API_BASE_URL=http://<ホストのIP>:8080/api` のように切り替える
+  // APIの接続先(backendのリバースプロキシ)。証明書はmkcertで作り、iOSシミュレータにCAを入れて使う。
+  // Androidエミュレータ・実機はCAを信頼させる対応をしていないので、今は使えない(backend/docs/HTTPSとリバースプロキシ.md)。
+  // 切り替えるときは`flutter run --dart-define=API_BASE_URL=https://<ホスト名>/api`
   static const String defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8080/api',
+    defaultValue: 'https://localhost/api',
   );
 
   TrackingRepository(

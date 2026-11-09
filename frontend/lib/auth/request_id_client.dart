@@ -1,37 +1,40 @@
 import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
 import '../utils/app_log.dart';
 
-/// リクエストごとにリクエストID(UUID)を作ってX-Request-IDヘッダーで送り、端末のログに出すHTTPクライアント。
-/// サーバーは同じIDをアクセスログ・アプリのログ・監査ログに残すので、端末で失敗したリクエストをサーバーのログから探せる
-/// (backend/docs/API設計ドラフト.mdの「リクエストID」)。
-/// - 送る前に1行出す(応答が届かずにタイムアウトした場合でも、IDが端末のログに残るように)
-/// - 失敗(4xx・5xx・通信できない)したら、もう1行出す
+/// 通信のたびに端末のログに出し、応答のリクエストID(X-Request-ID)を記録するHTTPクライアント。
+/// リクエストIDはサーバー(リバースプロキシ)が作り、サーバーは同じIDをアクセスログ・アプリのログ・監査ログに残すので、
+/// 端末の通信をサーバーのログから探せる(backend/docs/HTTPSとリバースプロキシ.mdの「リクエストID」)。端末からはIDを送らない。
+/// - 送る前に、時刻(UTC)を付けて1行出す(応答が届かなかった場合は、この時刻でサーバーのログを探す)
+/// - 応答が届いたら、ステータスとリクエストIDを1行出す(4xx・5xxは`failed`)
+/// - 通信できなかったら、時刻を付けて1行出す
 /// bodyは出さない(位置情報・パスワードが入るため)。
 class RequestIdClient extends http.BaseClient {
   static const header = 'X-Request-ID';
-  static const _uuid = Uuid();
 
   final http.Client _inner;
+  final DateTime Function() _now;
 
-  RequestIdClient([http.Client? inner]) : _inner = inner ?? http.Client();
+  RequestIdClient([http.Client? inner, DateTime Function()? now])
+    : _inner = inner ?? http.Client(),
+      _now = now ?? DateTime.now;
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    final requestId = request.headers[header] ??= _uuid.v4();
     final target = '${request.method} ${request.url.path}';
-    appLog('http', '$target request_id=$requestId');
+    appLog('http', '$target at=${_timestamp()}');
     try {
       final response = await _inner.send(request);
-      if (response.statusCode >= 400) {
-        appLog('http', '$target failed: ${response.statusCode} request_id=$requestId');
-      }
+      final requestId = response.headers[header.toLowerCase()];
+      final result = response.statusCode >= 400 ? 'failed: ${response.statusCode}' : '${response.statusCode}';
+      appLog('http', '$target $result request_id=$requestId');
       return response;
     } catch (e) {
-      appLog('http', '$target failed request_id=$requestId', error: e);
+      appLog('http', '$target failed at=${_timestamp()}', error: e);
       rethrow;
     }
   }
+
+  String _timestamp() => _now().toUtc().toIso8601String();
 
   @override
   void close() => _inner.close();
