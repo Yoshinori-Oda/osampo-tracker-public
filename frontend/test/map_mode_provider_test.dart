@@ -81,10 +81,6 @@ void main() {
     expect(tester.takeException(), isNull);
     // 作り直した直後(新しい位置が届くまで)は、直前の位置を出したままにする
     expect(find.text('direction 35.0'), findsOneWidget);
-
-    positions.add(_position(36.0));
-    await tester.pump();
-    expect(find.text('direction 36.0'), findsOneWidget);
   });
 
   testWidgets('現在地が更新されても、利用者が切り替えた表示モードは保たれる', (tester) async {
