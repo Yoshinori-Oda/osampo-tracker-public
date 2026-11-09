@@ -9,6 +9,33 @@ x-logging: &default-logging
     max-file: "3"
 
 services:
+  # リバースプロキシ。TLSを終端してHTTPSで公開し、/api/ だけをapiへ転送する(backend/docs/HTTPSとリバースプロキシ.md)。
+  # 外からの通信はここだけが受ける。実機を使わないので、ホストのループバックだけで待ち受ける
+  proxy:
+    image: nginx:1.28-alpine
+    ports:
+      - "127.0.0.1:443:443"
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./proxy/security_headers.conf:/etc/nginx/security_headers.conf:ro
+      # mkcertで作ったサーバーの証明書と秘密鍵(コミットしない)。JWTの署名鍵は見せないよう、tls/だけをマウントする
+      - ./secrets/tls:/etc/nginx/tls:ro
+    networks:
+      default:
+        # apiはこのIPから届いたときだけX-Forwarded-For・X-Forwarded-Protoを信用する(apiの--forwarded-allow-ips)
+        ipv4_address: 172.31.89.10
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # コンテナの中のループバックだけで待ち受ける確認用の口(nginx.conf)
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging: *default-logging
+
   db:
     image: postgis/postgis:16-3.4
     container_name: location_postgis
@@ -26,8 +53,9 @@ services:
       APP_DB_PASSWORD: ${APP_DB_PASSWORD}
       WORKER_DB_USER: ${WORKER_DB_USER}
       WORKER_DB_PASSWORD: ${WORKER_DB_PASSWORD}
+    # ホストのpsql等から使う。ホストのループバックだけに公開する
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgis_data:/var/lib/postgresql/data
       # ディレクトリごとマウントするとイメージの10_postgis.shが隠れるので、ファイル単位でマウントする
@@ -41,8 +69,10 @@ services:
 
   api:
     build: .
-    # アクセスログはアプリ(app/request_context.py)が出すので、uvicorn標準のものは止める
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload", "--no-access-log"]
+    # アクセスログはアプリ(app/request_context.py)が出すので、uvicorn標準のものは止める。
+    # X-Forwarded-For・X-Forwarded-Protoはproxy(固定のIP)から届いたときだけ信用し、送信元のIP・スキームを置き換える
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload", "--no-access-log",
+              "--forwarded-allow-ips", "172.31.89.10"]
     environment:
       # ログの形式(text・json)とレベル。項目はbackend/docs/バックエンド構成.mdの「ログ」
       LOG_FORMAT: ${LOG_FORMAT:-text}
@@ -63,8 +93,7 @@ services:
       EMAIL_CODE_MAX_FAILED_ATTEMPTS: ${EMAIL_CODE_MAX_FAILED_ATTEMPTS:-5}
       EMAIL_CODE_RESEND_INTERVAL_SECONDS: ${EMAIL_CODE_RESEND_INTERVAL_SECONDS:-60}
       EMAIL_CODE_DAILY_LIMIT: ${EMAIL_CODE_DAILY_LIMIT:-5}
-    ports:
-      - "8080:8080"
+    # ホストには公開しない(proxyを通してだけ使う。公開するとproxyを通らずにX-Forwarded-Forを偽って送れる)
     volumes:
       # 開発中はソースコードをbind mountし、--reloadで変更を反映する
       - ./app:/app/app
@@ -121,7 +150,15 @@ services:
   mailpit:
     image: axllent/mailpit
     ports:
-      - "8025:8025"
+      - "127.0.0.1:8025:8025"
+
+# proxyに固定のIPを割り当てるため、サブネットを固定する。ホストの他のネットワークと重なる場合は、こことproxyのIP・
+# apiの--forwarded-allow-ipsを合わせて変える(変えたら docker compose down してから up し直す)
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.89.0/24
 
 volumes:
   postgis_data:
