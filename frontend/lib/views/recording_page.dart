@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart' show Position;
 import 'package:latlong2/latlong.dart';
 import '../models/recording_phase.dart';
 import '../providers/tracking_providers.dart';
@@ -31,6 +32,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   Widget build(BuildContext context) {
     final mapState = ref.watch(mapModeProvider);
     final notifier = ref.read(mapModeProvider.notifier);
+    // 読み込み中・エラーの間も直前の値が返る(位置が一度取れた後は地図を出したままにする)
+    final position = ref.watch(currentPositionProvider).value;
     final phase = ref.watch(recordingPhaseProvider).value ?? RecordingPhase.idle;
     final isRecording = phase == RecordingPhase.recording;
     final isStarting = phase == RecordingPhase.starting;
@@ -40,14 +43,14 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
       || phase == RecordingPhase.stopping;
 
     // camera follows current position
-    if (mapState.position != null) {
+    if (position != null) {
       final currentLatLng = LatLng(
-        mapState.position!.latitude,
-        mapState.position!.longitude
+        position.latitude,
+        position.longitude
       );
 
       final rotationAngle = (mapState.topMode == MapTopMode.heading)
-        ? -mapState.position!.heading
+        ? -position.heading
         : 0.0;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -81,7 +84,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
             body: IndexedStack(
               index: mapState.pageMode.index,
               children: [
-                _buildStatisticsTabView(context, ref, mapState),
+                _buildStatisticsTabView(context, ref, mapState, position),
                 const MapControlTabView()
               ]
             ),
@@ -198,7 +201,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   Widget _buildStatisticsTabView(
     BuildContext context,
     WidgetRef ref,
-    MapModeState mapState
+    MapModeState mapState,
+    Position? position
   ) {
     return Column(
       children: [
@@ -207,7 +211,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
           height: MediaQuery.of(context).size.height * 0.38,
           child: Stack(
             children: [
-              _buildMapView(mapState),
+              _buildMapView(position),
 
               // compass button to toggle topMode
               Positioned(
@@ -221,7 +225,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                     ref.read(mapModeProvider.notifier).toggleTopMode();
                   },
                   child: RealCompassWidget(
-                    heading: mapState.position?.heading ?? 0.0,
+                    heading: position?.heading ?? 0.0,
                     isHeadingMode: mapState.topMode == MapTopMode.heading,
                     size: 40.0
                   )
@@ -277,14 +281,14 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
   }
 
   // flutter map builder
-  Widget _buildMapView(MapModeState mapState) {
-    if (mapState.position == null) {
+  Widget _buildMapView(Position? position) {
+    if (position == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
     final currentLatLng = LatLng(
-      mapState.position!.latitude,
-      mapState.position!.longitude
+      position.latitude,
+      position.longitude
     );
 
     return FlutterMap(
@@ -309,7 +313,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
               width: 40,
               height: 40,
               child: Transform.rotate(
-                angle: (mapState.position!.heading * pi) / 180,
+                angle: (position.heading * pi) / 180,
                 child: const Icon(
                   Icons.navigation,
                   size: 32,

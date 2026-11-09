@@ -99,26 +99,25 @@ final trackPointsBySessionIdProvider = FutureProvider.family<List<TrackPoint>, S
 enum RecordingPageMode { statistics, map }
 enum MapTopMode { direction, heading }
 
+// 収録画面の表示モード(利用者が切り替える状態だけを持つ)。
+// 現在地はcurrentPositionProviderを画面で直接watchする(ここに写してbuild中に書き換えると、
+// 画面が非表示から戻ったときに購読の再開でbuild中のproviderの変更になりassertが出る)
 class MapModeState {
   final RecordingPageMode pageMode;
   final MapTopMode topMode;
-  final Position? position;
 
   MapModeState({
     required this.pageMode,
     required this.topMode,
-    this.position
   });
 
   MapModeState copyWith({
     RecordingPageMode? pageMode,
     MapTopMode? topMode,
-    Position? position
   }) {
     return MapModeState(
       pageMode: pageMode ?? this.pageMode,
       topMode: topMode ?? this.topMode,
-      position: position ?? this.position
     );
   }
 }
@@ -126,17 +125,9 @@ class MapModeState {
 class MapModeNotifier extends Notifier<MapModeState> {
   @override
   MapModeState build() {
-    ref.listen<AsyncValue<Position>>(currentPositionProvider, (previous, next) {
-      final newPosition = next.value;
-      if (newPosition != null) {
-        state = state.copyWith(position: newPosition);
-      }
-    });
-
     return MapModeState(
       pageMode: RecordingPageMode.statistics,
       topMode: MapTopMode.direction,
-      position: null
     );
   }
 
