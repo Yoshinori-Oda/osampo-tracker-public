@@ -365,7 +365,7 @@ https_checks() {
     fi
   done
   if [[ $limited -gt 0 ]]; then
-    https_expect "続けてログインすると$limited回目で429" 429 too_many_requests "$status"
+    https_expect "続けてログインすると${limited}回目で429" 429 too_many_requests "$status"
     [[ "$retry_after" == 1 ]] && https_ok "429にRetry-After: 1が付く" || https_ng "Retry-After: $retry_after"
   else
     https_ng "20回続けてログインしても429にならない"
