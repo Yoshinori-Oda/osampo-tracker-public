@@ -4,10 +4,11 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test_tracking_01/auth/request_id_client.dart';
 
-// RequestIdClientが、リクエストごとにX-Request-IDを付け、失敗したらそのIDを端末のログに出すことの確認
-// (backend/docs/API設計ドラフト.mdの「リクエストID」)
+// RequestIdClientが、リクエストIDを送らず、応答のX-Request-IDと送った時刻を端末のログに出すことの確認
+// (backend/docs/HTTPSとリバースプロキシ.mdの「リクエストID」)
 
-final _uuidPattern = RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$');
+final _sentAt = DateTime.utc(2026, 11, 9, 1, 2, 3, 456);
+const _requestId = '0123456789abcdef0123456789abcdef';
 
 void main() {
   late List<String> logs;
@@ -21,53 +22,56 @@ void main() {
 
   tearDown(() => debugPrint = originalDebugPrint);
 
-  test('リクエストごとに別のUUIDをX-Request-IDで送る', () async {
-    final sent = <http.Request>[];
-    final client = RequestIdClient(MockClient((request) async {
-      sent.add(request);
-      return http.Response('', 204);
-    }));
+  RequestIdClient clientReturning(int status, {Map<String, String> headers = const {}, String body = ''}) {
+    return RequestIdClient(
+      MockClient((_) async => http.Response(body, status, headers: headers)),
+      () => _sentAt,
+    );
+  }
 
-    await client.get(Uri.parse('http://test/api/users/me'));
-    await client.get(Uri.parse('http://test/api/users/me'));
-
-    final ids = sent.map((r) => r.headers[RequestIdClient.header]!).toList();
-    expect(ids, everyElement(matches(_uuidPattern)));
-    expect(ids.toSet(), hasLength(2));
-    // 送る前にIDを出す(応答が届かなかった場合でも、IDが残るように)
-    expect(logs, ['[http] GET /api/users/me request_id=${ids[0]}', '[http] GET /api/users/me request_id=${ids[1]}']);
-  });
-
-  test('既にX-Request-IDが付いていれば、そのまま送る', () async {
+  test('X-Request-IDは送らない', () async {
     late http.Request sent;
     final client = RequestIdClient(MockClient((request) async {
       sent = request;
       return http.Response('', 204);
     }));
 
-    await client.get(Uri.parse('http://test/health'), headers: {RequestIdClient.header: 'given-request-id'});
+    await client.get(Uri.parse('https://test/api/users/me'));
 
-    expect(sent.headers[RequestIdClient.header], 'given-request-id');
+    expect(sent.headers.keys.map((k) => k.toLowerCase()), isNot(contains('x-request-id')));
   });
 
-  test('4xx・5xxならステータスとリクエストIDをログに出し、レスポンスはそのまま返す', () async {
-    final client = RequestIdClient(MockClient((_) async => http.Response('{"code":"internal_error"}', 500)));
+  test('送る前に時刻を、応答が届いたらステータスと応答のリクエストIDを出す', () async {
+    final client = clientReturning(204, headers: {'x-request-id': _requestId});
 
-    final response = await client.post(Uri.parse('http://test/api/users/u1/sessions'), body: '{"secret":"x"}');
+    await client.get(Uri.parse('https://test/api/users/me'));
+
+    expect(logs, [
+      '[http] GET /api/users/me at=2026-11-09T01:02:03.456Z',
+      '[http] GET /api/users/me 204 request_id=$_requestId',
+    ]);
+  });
+
+  test('4xx・5xxならfailedとステータス・リクエストIDを出し、レスポンスはそのまま返す', () async {
+    final client = clientReturning(500, headers: {'x-request-id': _requestId}, body: '{"code":"internal_error"}');
+
+    final response = await client.post(Uri.parse('https://test/api/users/u1/sessions'), body: '{"secret":"x"}');
 
     expect(response.statusCode, 500);
-    final requestId = RegExp(r'request_id=(\S+)').firstMatch(logs.first)!.group(1);
-    expect(logs.last, '[http] POST /api/users/u1/sessions failed: 500 request_id=$requestId');
+    expect(logs.last, '[http] POST /api/users/u1/sessions failed: 500 request_id=$_requestId');
     // bodyはログに出さない
     expect(logs.join('\n'), isNot(contains('secret')));
   });
 
-  test('通信できなければリクエストIDをログに出して、例外はそのまま投げる', () async {
-    final client = RequestIdClient(MockClient((_) async => throw http.ClientException('offline')));
+  test('通信できなければ時刻を付けてログに出し、例外はそのまま投げる', () async {
+    final client = RequestIdClient(
+      MockClient((_) async => throw http.ClientException('offline')),
+      () => _sentAt,
+    );
 
-    await expectLater(client.get(Uri.parse('http://test/api/users/me')), throwsA(isA<http.ClientException>()));
+    await expectLater(client.get(Uri.parse('https://test/api/users/me')), throwsA(isA<http.ClientException>()));
 
-    expect(logs.last, startsWith('[http] GET /api/users/me failed request_id='));
+    expect(logs.last, startsWith('[http] GET /api/users/me failed at=2026-11-09T01:02:03.456Z'));
     expect(logs.last, contains('offline'));
   });
 }
