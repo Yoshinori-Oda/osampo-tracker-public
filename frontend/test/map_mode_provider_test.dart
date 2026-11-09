@@ -19,19 +19,36 @@ Position _position(double latitude) => Position(
   speedAccuracy: 0,
 );
 
+// currentPositionProviderの依存先の代わり(アプリではログインし直しでtrackingServiceProviderが作り直される)
+class _RestartNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void restart() => state++;
+}
+
+final _restartProvider = NotifierProvider<_RestartNotifier, int>(_RestartNotifier.new);
+
 void main() {
-  // 保存/破棄画面を閉じたときのように、収録画面が非表示(TickerModeがoff)の間に現在地が更新され、
-  // build中に再び表示されても、providerの変更でassertにならないこと
-  testWidgets('非表示の間に現在地が更新されても、再表示のbuild中にproviderが変更されない', (tester) async {
-    final positions = StreamController<Position>();
+  // 保存/破棄画面を開いている間のように、収録画面が非表示(TickerModeがoff)で購読が止まっている間に
+  // currentPositionProviderの依存先が変わると、再表示のbuild中にcurrentPositionProviderが作り直される。
+  // そのときにmapModeProviderが変更されてassertにならないこと
+  testWidgets('非表示の間に現在地のproviderの依存先が変わっても、再表示のbuild中にproviderが変更されない', (tester) async {
+    // 作り直しで購読し直すのでbroadcastにする
+    final positions = StreamController<Position>.broadcast();
     addTearDown(positions.close);
     final tickerEnabled = ValueNotifier(true);
     addTearDown(tickerEnabled.dispose);
+    final container = ProviderContainer(overrides: [
+      currentPositionProvider.overrideWith((ref) {
+        ref.watch(_restartProvider);
+        return positions.stream;
+      }),
+    ]);
+    addTearDown(container.dispose);
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        currentPositionProvider.overrideWith((ref) => positions.stream),
-      ],
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
       child: MaterialApp(
         home: ValueListenableBuilder<bool>(
           valueListenable: tickerEnabled,
@@ -55,13 +72,18 @@ void main() {
 
     tickerEnabled.value = false;
     await tester.pump();
-    positions.add(_position(36.0));
+    container.read(_restartProvider.notifier).restart();
     await tester.pump();
 
     tickerEnabled.value = true;
     await tester.pump();
 
     expect(tester.takeException(), isNull);
+    // 作り直した直後(新しい位置が届くまで)は、直前の位置を出したままにする
+    expect(find.text('direction 35.0'), findsOneWidget);
+
+    positions.add(_position(36.0));
+    await tester.pump();
     expect(find.text('direction 36.0'), findsOneWidget);
   });
 
