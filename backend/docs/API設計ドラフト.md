@@ -4,11 +4,11 @@
 `frontend/docs/ユーザー機能追加に伴う変更予定.md`を参照。
 
 ## server
-url: http://localhost:8080/api
-(以下のendpointsのパスはこのurlからの相対パス。例: `GET /users/{user_id}/sessions` は `http://localhost:8080/api/users/{user_id}/sessions`。
+url: https://localhost/api (開発環境。リバースプロキシ経由。`backend/docs/HTTPSとリバースプロキシ.md`)
+(以下のendpointsのパスはこのurlからの相対パス。例: `GET /users/{user_id}/sessions` は `https://localhost/api/users/{user_id}/sessions`。
 実装: 同期は`backend/app/routers/sessions.py`、認証・ユーザーは`backend/app/routers/auth.py`・`backend/app/routers/users.py`(ブロック2で実装))
 
-OpenAPI(実装から自動生成): http://localhost:8080/docs (JSONは http://localhost:8080/openapi.json )
+OpenAPI(実装から自動生成): apiのコンテナの中の`http://localhost:8080/openapi.json`(リバースプロキシでは公開しない。`docker compose exec api python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8080/openapi.json').read().decode())"`で取り出せる)
 - 役割分担: このドキュメント=判断の理由と処理の手順、OpenAPI=入出力の型・各項目の説明・例・ステータスごとのcode
 - OpenAPIの内容(operationId・エラーのcodeの記載・例)は`backend/tests/test_openapi.py`で確認している
 
@@ -46,9 +46,10 @@ OpenAPI(実装から自動生成): http://localhost:8080/docs (JSONは http://lo
 
 ### リクエストID
 - 全てのレスポンスに`X-Request-ID`ヘッダーを付ける(サーバーのアクセスログ・アプリのログ・監査ログの突き合わせに使う)
-- クライアントは、リクエストごとにUUIDを作って`X-Request-ID`で送ってよい(このアプリの端末は送る)。形式(英数字と`-`の8〜64文字)に
-  合えばサーバーはそれを使い、合わなければ・無ければサーバーで作る。応答が届かなかった(タイムアウト)場合でも、端末のログのIDで
-  サーバーのログを探せるようにするため。クライアントが送る値なので、突き合わせ以外(認証・重複の判定等)には使わない
+- IDはリバースプロキシがリクエストごとに作る。クライアントが`X-Request-ID`を送っても使わない(サーバーのログに残るIDを、サーバーが
+  作ったものだけにするため)。クライアントは応答の`X-Request-ID`を自分のログに出す(このアプリの端末は出す)。
+  詳細は`backend/docs/HTTPSとリバースプロキシ.md`の「リクエストID」
+- ログでの振り返りにだけ使い、処理(認証・重複の判定等)には使わない
 
 ### エラーレスポンス
 - 4xx・5xxのレスポンスbodyは全て以下の形式で返す FastAPIが既定で返すエラー(バリデーションエラーの422、
@@ -92,12 +93,13 @@ OpenAPI(実装から自動生成): http://localhost:8080/docs (JSONは http://lo
 | `email_already_verified` | 409 | メールアドレスは確認済みなので、確認コードを送らない |
 | `invalid_verification_code` | 400 | 確認コードが違う(入力し直せる) |
 | `verification_code_expired` | 400 | 有効な確認コードが無い(期限切れ・失敗の上限に達した・未送信。クライアントは再送を促す) |
-| `too_many_requests` | 429 | 確認コードの送信の間隔・回数、またはログイン・現在のパスワードの確認の試行回数の上限に達した(`Retry-After`ヘッダーの秒数だけ待つ) |
+| `too_many_requests` | 429 | 確認コードの送信の間隔・回数、ログイン・現在のパスワードの確認の試行回数、または送信元のIPごとの流量(リバースプロキシ)の上限に達した(`Retry-After`ヘッダーの秒数だけ待つ) |
 | `deleted` | 409 | 対象のsessionが削除済み(tombstone)で、編集内容と競合している |
 | `payload_too_large` | 413 | bodyがサイズの上限(10MB)を超えている |
 | `unsupported_media_type` | 415 | Content-Typeが`application/json`でない(media typeはContent-Typeの値を指すHTTPの用語) |
 | `validation_error` | 422 | 入力チェックの失敗。`details`にどの項目がなぜ不正かを入れる |
 | `internal_error` | 500 | 想定外のエラー |
+| `service_unavailable` | 502・504 | apiにつながらない・apiの応答が時間内に来ない(リバースプロキシが返す。クライアントは後で再試行する) |
 | `http_error` | その他 | 上記に当てはまらないHTTPのエラー |
 
 ## endpoints

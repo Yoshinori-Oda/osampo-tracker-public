@@ -23,10 +23,12 @@ flowchart LR
     end
 
     subgraph backend["バックエンド (docker compose)"]
-        api["api<br/>FastAPI + uvicorn<br/>:8080"]
+        proxy["proxy<br/>nginx<br/>127.0.0.1:443 (HTTPS)"]
+        api["api<br/>FastAPI + uvicorn<br/>:8080 (composeの中だけ)"]
         worker["worker<br/>APScheduler"]
         db[("db<br/>PostgreSQL 16 + PostGIS")]
-        mailpit["mailpit<br/>開発用SMTP<br/>Web UI :8025"]
+        mailpit["mailpit<br/>開発用SMTP<br/>Web UI 127.0.0.1:8025"]
+        proxy -- "HTTP /api/" --> api
         api --> db
         worker --> db
         worker -- SMTP --> mailpit
@@ -34,7 +36,7 @@ flowchart LR
 
     osm["OpenStreetMap<br/>タイルサーバー"]
 
-    app -- "HTTPS/HTTP (REST, JSON)<br/>Authorization: Bearer" --> api
+    app -- "HTTPS (REST, JSON)<br/>Authorization: Bearer" --> proxy
     app -- 地図タイル --> osm
 ```
 
@@ -45,6 +47,7 @@ flowchart LR
 | モバイルアプリ | 位置情報の収録、記録の閲覧・編集・統計、ログイン・登録、サーバーとの同期 | `frontend/`(Flutter / Riverpod) |
 | ローカルDB | 収録したセッションと位置情報の点を保存する。ログインしたユーザーごとにデータを分ける | `frontend/lib/database/`(Drift / SQLite) |
 | トークンの保存領域 | アクセストークン・リフレッシュトークンを保存する。パスワードは端末に保存しない | `frontend/lib/auth/auth_storage.dart`(flutter_secure_storage) |
+| proxy | リバースプロキシ。TLSを終端してHTTPSで公開し、`/api/`だけをapiへ転送する。送信元のIP・リクエストIDの付与、流量・大きさ・時間の上限、アクセスログ | `backend/proxy/`(nginx)。詳細は`backend/docs/HTTPSとリバースプロキシ.md` |
 | api | REST APIを提供する(認証・ユーザー・セッションの同期・ヘルスチェック) | `backend/app/`(FastAPI)。`main.py`・`routers/` |
 | worker | 定期実行のジョブ。outboxのメールの送信(5秒ごと)と、期限切れデータのパージ(24時間ごと) | `backend/app/worker.py`。apiと同じイメージで起動コマンドだけ変える。ジョブの重複を避けるため1つだけ起動する |
 | db | サーバー側のデータ(ユーザー・ログイン状態・セッション・位置情報の点・メール)を保存する | PostgreSQL 16 + PostGIS。スキーマはAlembic(`backend/migrations/`)で管理 |
@@ -108,9 +111,10 @@ apiの応答がSMTPサーバーの遅延・障害の影響を受けず、送信�
 ## 実行環境
 
 - **開発環境だけがある**。本番環境・ステージング環境は無い
-- バックエンドは開発者のPC(ホスト)の`docker compose`で起動する。公開しているポートは api `8080`・db `5432`・mailpit `8025`
-- アプリはホストの`flutter run`で、シミュレータ/エミュレータ・実機に入れて動かす。接続先のAPIは既定で`http://localhost:8080/api`で、
-  実機・Androidエミュレータからは`--dart-define=API_BASE_URL=http://<ホストのIP>:8080/api`で切り替える
+- バックエンドは開発者のPC(ホスト)の`docker compose`で起動する。ホストに公開しているポートは proxy `443`(HTTPS)・db `5432`・
+  mailpit `8025`で、いずれもホストのループバック(`127.0.0.1`)だけ。apiはホストに公開せず、proxyを通してだけ使う
+- アプリはホストの`flutter run`で、iOSシミュレータに入れて動かす。接続先のAPIは既定で`https://localhost/api`。証明書はmkcert
+  (手元に作るCA)で発行し、シミュレータにCAを信頼させる。Androidエミュレータ・実機はCAを信頼させる対応をしていないので、今は使わない
 - Claude Codeを動かすdevcontainerにはFlutter SDKもDockerデーモンも無いため、ビルド・テストはすべてホスト側で行う
   (`docs/development.md`の「開発環境」)
 - ストアでの公開はしていない
@@ -145,3 +149,4 @@ apiの応答がSMTPサーバーの遅延・障害の影響を受けず、送信�
 | `docs/design/session-recovery.md` | 起動時の未完了セッションの回収 |
 | `backend/docs/API設計ドラフト.md` | APIの仕様 |
 | `backend/docs/バックエンド構成.md` | バックエンド構成を選んだ理由・主な決定事項・実装方針・DBのロール・認証・メール |
+| `backend/docs/HTTPSとリバースプロキシ.md` | リバースプロキシ(nginx)・証明書・TLSの設定・送信元のIPとリクエストID・流量などの上限 |

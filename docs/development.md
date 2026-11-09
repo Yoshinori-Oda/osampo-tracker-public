@@ -35,7 +35,8 @@
     0008は監査ログのリクエストID、0009はRLSとworker用のロールの権限
   - db/init/: DBコンテナの初回起動時に実行するスクリプト(ロール(migrator・api・worker)・テスト用データベース・拡張機能・権限)
   - db/seed.sql: 開発用のダミーデータ(テストユーザー`1111...`とセッション)
-  - docker-compose.yml: db / api / worker / mailpit。DBの接続情報は`backend/.env`(コミットしない)。
+  - proxy/: リバースプロキシ(nginx)の設定。TLSを終端してHTTPSで公開し、`/api/`だけをapiへ転送する
+  - docker-compose.yml: proxy / db / api / worker / mailpit。DBの接続情報は`backend/.env`(コミットしない)。
     メールはapiがoutboxに積み、workerがmailpitへ送る(届いたメールは http://localhost:8025 で見る)
   - docs/: API設計・バックエンド構成の詳細設計(下記「ドキュメント索引」)
 - docs: 基本設計・詳細設計・テスト・落とし穴(下記「ドキュメント索引」)
@@ -81,6 +82,7 @@
 | `docs/pitfalls.md` | 下記「既知の落とし穴」の症状・原因の詳細 | 該当箇所を触る、似た不具合を調べる |
 | `backend/docs/API設計ドラフト.md` | APIサーバー(FastAPI)のエンドポイント・エラー形式・認証と権限 | APIを実装する、APIの仕様を変える |
 | `backend/docs/バックエンド構成.md` | 構成の選定理由・主な決定事項と、実装方針・マイグレーション・DBロール・パージ・テストの詳細設計 | `backend/`を触る |
+| `backend/docs/HTTPSとリバースプロキシ.md` | リバースプロキシ(nginx)・証明書(mkcert)・TLSの設定・送信元のIPとリクエストID・流量などの上限 | `backend/proxy/`・composeのポート・証明書・接続先のURLを触る |
 | `backend/docs/メール送信の運用.md` | メールをサーバーから送って運用するための論点(送信手段・到達性・バウンス・outbox・悪用対策・テスト)の整理 | メール送信の設計・実装をする |
 | `frontend/docs/ユーザー機能追加に伴う変更予定.md` | APIに合わせてfrontendで必要になる変更 | `repositories/`・認証・アカウントまわりを触る |
 
@@ -119,7 +121,8 @@
 - **backendのホスト側での実行は`backend/scripts/run_checks.sh <run_id> [step...]`で行う**(どこから実行してもよい)。
   frontend版と同じ形で、run_idの扱い・step順の固定・途中で失敗しても残りを実行するのも同じ。stepは
   `lock`(uv lock)/`up`(docker compose up -d --build)/`migrate`(開発用・テスト用DBへのalembic upgrade head)/`check`(alembic check)/
-  `lint`(ruff check)/`test`(pytest。`-t`で絞れる)/`all`(=up migrate check lint test)で、省略時は`migrate check lint test`。
+  `lint`(ruff check)/`test`(pytest。`-t`で絞れる)/`https`(リバースプロキシ越しのHTTPSの確認。curlで証明書・ヘッダー・上限を確かめる)/
+  `all`(=up migrate check lint test https)で、省略時は`migrate check lint test`。
   - 依存パッケージを変えたら`lock up`、Dockerfile・compose・`pyproject.toml`・`alembic.ini`を変えたら`up`も付けて実行する
     (`app/`・`tests/`・`migrations/`以外はbind mountしていないので、イメージの作り直しが必要)
   - 結果は`backend/host_check_logs/<timestamp>_<run_id>_<PASSED|FAILED>/`に保存される(`.gitignore`済み)。
@@ -185,16 +188,19 @@
   効いているか確認する(`.dart_tool/package_config.json`の取り合い)
 - mainとworktreeの`backend`はcomposeのプロジェクト名(`backend`)・DBのボリュームを共有する。ユーザーの登録し直しは不要だが、
   古いコンテナが残ると`secrets/`のマウントが反映されずログインだけが500になる。おかしいときは`down`→`up`し直す
-- シミュレータのアプリだけがAPIに繋がらない(タイムアウトし、APIのログにも届かない)ときは、Macの`127.0.0.1:8080`を
-  Docker以外(VSCodeのプロセス等)が待ち受けていないか`lsof -nP -iTCP:8080 -sTCP:LISTEN`で確認する
+- シミュレータのアプリだけがAPIに繋がらない(タイムアウトし、APIのログにも届かない)ときは、Macの`127.0.0.1:443`を
+  Docker以外(VSCodeのプロセス等)が待ち受けていないか`lsof -nP -iTCP:443 -sTCP:LISTEN`で確認する
+- シミュレータのアプリがHTTPSでつながらない(証明書のエラー)ときは、シミュレータにmkcertのCAを入れたか確認する(シミュレータを作り直したり、
+  初期化したりすると消える)。証明書の検証を無効にして回避しない
 - Driftのクエリで`&`・`|`を使うファイルでは`package:drift/drift.dart`をimportする。`flutter_secure_storage`は11系を使う
   (9系は`geolocator`とwin32が衝突する)
 
 ## デバッグ Tips
 
 - 端末のログは`appLog`の`[sync] ...`・`[auth] ...`・`[http] ...`の行で見る(リリースビルドでは出さない)。
-  通信は`[http]`の行にリクエストID(`X-Request-ID`)が出るので、backendのログ(`docker compose logs api | grep <ID>`)と突き合わせられる
-- backendのログは`docker compose logs api`・`docker compose logs worker`で見る(key=value。`LOG_FORMAT=json`でJSON)。
+  通信は`[http]`の行に応答のリクエストID(`X-Request-ID`。リバースプロキシが作る)が出るので、backendのログ
+  (`docker compose logs proxy api | grep <ID>`)と突き合わせられる。応答が届かなかったリクエストはIDが無いので、時刻でproxyのログを探す
+- backendのログは`docker compose logs proxy`・`docker compose logs api`・`docker compose logs worker`で見る(key=value。`LOG_FORMAT=json`でJSON)。
   3つのログ(アクセス・アプリ・監査)の役割は`backend/docs/バックエンド構成.md`の「ログ」
 - 複数端末での同期テストは、複数のシミュレータ/実機で同じユーザー(`app.cli seed-dev`のテストユーザー
   `testuser@example.com`等)にログインして行う。同期はメールアドレスが確認済みのユーザーでしか行われない
@@ -204,9 +210,10 @@
 backendの`docker compose`も含め、以下はすべてホスト側で実行する。
 
 ```bash
-# 起動(同期先は既定でhttp://localhost:8080/api。実機・Androidエミュレータからはlocalhostに届かないので切り替える)
+# 起動(同期先は既定でhttps://localhost/api。iOSシミュレータで使う。Androidエミュレータ・実機は証明書を信頼させる対応をしていないので使えない)
 flutter run
-flutter run --dart-define=API_BASE_URL=http://<ホストのIP>:8080/api
+# iOSシミュレータにmkcertのCAを入れる(シミュレータを起動した状態で。作り直し・初期化したら入れ直す)
+xcrun simctl keychain booted add-root-cert "$(mkcert -CAROOT)/rootCA.pem"
 
 # 以下はfrontendディレクトリで実行し、結果はhost_check_logs/<timestamp>_<run_id>_<結果>/に残る
 # 静的解析 + ユニット/ウィジェットテスト(既定)
@@ -238,6 +245,11 @@ docker compose exec -T db psql -U osampo_migrator -d location_db < db/seed.sql
 # 開発用のユーザー(管理者・テストユーザー1111...・メール未確認のユーザー)のパスワード等を設定する。ログイン情報が表示される
 docker compose run --rm api python -m app.cli seed-dev
 
+# HTTPSの証明書を作る(初回と、約2年後の期限切れの前のみ。backend/secrets/はコミットしない。mkcert -installは実行しない)
+mkdir -p secrets/tls
+mkcert -cert-file secrets/tls/cert.pem -key-file secrets/tls/key.pem localhost 127.0.0.1 10.0.2.2
+# 動作の確認(ホストから)
+curl --cacert "$(mkcert -CAROOT)/rootCA.pem" https://localhost/api/
 # アクセストークンを署名するES256の鍵のペアを作る(初回のみ。backend/secrets/はコミットしない)
 mkdir -p secrets
 openssl ecparam -name prime256v1 -genkey -noout -out secrets/jwt_private.pem
