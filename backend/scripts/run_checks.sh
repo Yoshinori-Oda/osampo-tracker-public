@@ -238,8 +238,18 @@ https_checks() {
   fi
   HTTPS_CA="$caroot/rootCA.pem"
 
+  echo "--- proxyの状態(起動していない・unhealthyならログで原因を見る) ---"
+  docker compose ps proxy
+  docker compose logs --no-log-prefix --tail 20 proxy
+
+  echo
   echo "--- 証明書 ---"
-  openssl x509 -noout -subject -enddate -ext subjectAltName -in secrets/tls/cert.pem || https_ng "secrets/tls/cert.pem を読めない"
+  # macOSのopenssl(LibreSSL)には -ext が無いので、SANは -text から取り出す
+  if openssl x509 -noout -subject -enddate -in secrets/tls/cert.pem; then
+    openssl x509 -noout -text -in secrets/tls/cert.pem | grep -A 1 'Subject Alternative Name' | tail -n 1 | sed -E 's/^ +/SAN: /'
+  else
+    https_ng "secrets/tls/cert.pem を読めない"
+  fi
 
   echo
   echo "--- 接続とTLS ---"
@@ -313,9 +323,12 @@ https_checks() {
     https_ng "クライアントが送ったX-Request-IDが使われた: $request_id"
   fi
   sleep 1
-  local api_line proxy_line
-  api_line="$(docker compose logs --no-log-prefix --since 2m api 2>/dev/null | grep "app.access" | grep "$request_id" | tail -n 1)"
-  proxy_line="$(docker compose logs --no-log-prefix --since 2m proxy 2>/dev/null | grep "proxy.access" | grep "$request_id" | tail -n 1)"
+  local api_line="" proxy_line=""
+  # IDが取れなかったら探さない(空の文字列のgrepは全ての行に当たる)
+  if [[ -n "$request_id" ]]; then
+    api_line="$(docker compose logs --no-log-prefix --since 2m api 2>/dev/null | grep "app.access" | grep "$request_id" | tail -n 1)"
+    proxy_line="$(docker compose logs --no-log-prefix --since 2m proxy 2>/dev/null | grep "proxy.access" | grep "$request_id" | tail -n 1)"
+  fi
   echo "api:   $api_line"
   echo "proxy: $proxy_line"
   # IPが偽のX-Forwarded-Forでなく(proxyが上書きした)、proxyのIPでもない(apiがproxyのX-Forwarded-Forを信用した)こと

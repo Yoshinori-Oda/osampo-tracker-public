@@ -12,7 +12,7 @@ services:
   # リバースプロキシ。TLSを終端してHTTPSで公開し、/api/ だけをapiへ転送する(backend/docs/HTTPSとリバースプロキシ.md)。
   # 外からの通信はここだけが受ける。実機を使わないので、ホストのループバックだけで待ち受ける
   proxy:
-    image: nginx:1.28-alpine
+    image: nginx:1.30-alpine
     ports:
       - "127.0.0.1:443:443"
     volumes:
