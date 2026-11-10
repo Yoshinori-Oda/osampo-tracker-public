@@ -1,39 +1,41 @@
 # DBとマイグレーション
 
-スキーマとマイグレーション(Alembic)、DBのロールと接続、行レベルセキュリティ(RLS)の設計。
+スキーマとマイグレーション(Alembic)、DBのロールと接続、行レベルセキュリティ(RLS)の設計。2026-11-10時点のmainの実装を正とする。
+テーブルの一覧とER図は`docs/basic-design/data.md`。
 
 ## スキーマとマイグレーション
 
-- スキーマはAlembicで管理する(`backend/alembic.ini`・`backend/migrations/`)。初期マイグレーション
-  (`migrations/versions/0001_initial_schema.py`)は旧`initdb.sql`のスキーマ(users / sessions / track_points、
-  インデックス、PostgRESTが使っていたストアドファンクション)をそのまま写し、変更は2本目以降のマイグレーションで行う
-  - ORMのモデル(`app/models/`)はマイグレーションと同じ定義にし、`alembic check`で差分が無いことを確認する
-  - マイグレーションのrevisionは連番(`0001`, `0002`, ...)を手で付け、ファイル名は`連番_内容.py`にする
+- スキーマはAlembicで管理する(`backend/alembic.ini`・`backend/migrations/`)
+  - ORMのモデル(`app/models/`)はマイグレーションと同じ定義にし、`alembic check`で差分が無いことを確かめる(`run_checks.sh`の`check`・CI)
+  - revisionは連番(`0001`, `0002`, ...)を手で付け、ファイル名は`連番_内容.py`にする
+  - `postgis/postgis`イメージに含まれるPostGISのテーブル(`spatial_ref_sys`等)は、自動生成の対象から外す
+- マイグレーションの一覧:
+
+  | revision | 内容 |
+  |---|---|
+  | 0001 | 最初のスキーマ(users・sessions・track_points)。PostgRESTで使っていたときのスキーマを写したもの |
+  | 0002 | `elevation_gain`・`max_altitude`・`min_altitude`を`REAL`から`double precision`にする(POSTの再送の判定で値を比べるため。同期で精度を落とさないため) |
+  | 0003 | PostgRESTの名残を消す(ストアドファンクションとPostgREST用のロールの権限)。`deleted_at`の意味を「削除した日時」にそろえる |
+  | 0004 | 認証(usersの拡張、`auth_sessions`・`refresh_tokens`) |
+  | 0005 | メールのoutbox(`outbox_emails`) |
+  | 0006 | メールアドレスの確認コード(`email_codes`) |
+  | 0007 | 監査ログ(`audit_events`) |
+  | 0008 | 監査ログのリクエストID |
+  | 0009 | 行レベルセキュリティ(RLS)とworker用のロールの権限 |
+
 - DBの中身は2段階で作る:
-  1. DBコンテナの初回起動時(ボリュームが空のときだけ): `db/init/20_roles_and_databases.sh`がロール・テスト用データベース・
-     拡張機能(postgis / uuid-ossp)・権限を用意する。拡張機能の作成にはスーパーユーザーの権限が必要なので、Alembicではなくここで作る。
+  1. DBコンテナの初回の起動時(ボリュームが空のときだけ): `db/init/20_roles_and_databases.sh`がロール・テスト用のデータベース・
+     拡張機能(postgis / uuid-ossp)・権限を用意する。拡張機能の作成にはスーパーユーザーの権限が要るので、Alembicではなくここで作る。
      postgis/postgisイメージの`10_postgis.sh`の後に実行されるよう、ファイル単位でマウントしている。
      `10_postgis.sh`が開発用のデータベースに入れる使わない拡張機能(`postgis_topology`・`fuzzystrmatch`・
-     `postgis_tiger_geocoder`)は削除し、`search_path`も元に戻す(`postgis_topology`が追加する`topology`スキーマの
+     `postgis_tiger_geocoder`)は削除し、`search_path`も元に戻す(`postgis_topology`が作る`topology`スキーマの
      テーブルを`alembic check`がモデルに無いテーブルとして検出するため。テスト用のデータベースと環境を揃えるためでもある)
-  2. 起動後: 開発用・テスト用の各データベースに`alembic upgrade head`を実行し、テーブル等を作る
+  2. 起動の後: 開発用・テスト用の各データベースに`alembic upgrade head`を実行し、テーブル等を作る(`run_checks.sh`の`migrate`)
 - データベースは同じDBコンテナ(PostgreSQLサーバー)の中に2つ置く:
-  - `location_db`(`POSTGRES_DB`): 開発用。api・worker(frontendの同期)が使う
+  - `location_db`(`POSTGRES_DB`): 開発用。api・workerが使う
   - `location_db_test`(`POSTGRES_TEST_DB`): pytest専用。`tests/conftest.py`で接続先をこちらに切り替える
-- 最初のスキーマ変更(`0002_altitude_columns_to_double_precision.py`): `elevation_gain`・`max_altitude`・`min_altitude`を
-  `REAL`から`double precision`にした(POSTの再送判定で値を比較するため。同期で取得したデータの精度を落とさないため)。
-  PostgRESTが使っていた`register_session_with_points`も3列の値を`::real`に変換していたので、`::double precision`に作り直した
-- PostgRESTの削除(`0003_remove_postgrest.py`、frontendの同期を新しいAPIへ切り替えた後): ストアドファンクションを削除し、
-  `deleted_at`の意味を「削除した日時」に統一した。PostgREST時代のtombstoneは`deleted_at`にパージ予定日時(削除の90日後。
-  未来の日時)が入っているので、その行だけを90日前に戻すデータ移行を行う(新しいAPIで削除した行は過去の日時なので当たらない)。
-  PostgREST用のロール`web_anon`の権限も外す(ロール自体の削除はスーパーユーザーの権限が必要なので行わない。
-  既存のボリュームには`web_anon`・`authenticator`が残るが、権限は無い。ボリュームを作り直せば作られない)。
-  downgradeはストアドファンクションを0001・0002のファイルから読み込んで作り直す
-- `postgis/postgis`イメージに含まれるPostGISのテーブル(`spatial_ref_sys`等)は、Alembicの自動生成の対象から外す
-- マイグレーションは`api`の起動時には実行せず、別のコマンドで個別に実行する
-  (例: `docker compose run --rm api alembic upgrade head`)。本番ではデプロイの手順の中で1回だけ実行するのが一般的なため
-- 既存の開発データは移行しない。ボリュームを作り直し、シード(初期の管理者・パスワード付きのテストユーザー・
-  テスト用のセッション)で入れ直す
+- マイグレーションは`api`の起動時には実行せず、別のコマンドで実行する(`docker compose run --rm api alembic upgrade head`)。
+  本番ではデプロイの手順の中で1回だけ実行するのが一般的なため
 
 ## DBのロールと接続
 
@@ -55,14 +57,14 @@
 - DBセッションは`app/db.py`の`app_session()`(api・管理用のコマンド)と`worker_session()`(worker)で作る。接続は使うときに初めて作る
   (プロセスが使わないロールの接続情報を要求しないため)
 - `api`・`worker`からはcomposeのネットワーク内でサービス名`db`で接続する
-- 開発中はホストのDBクライアントから確認できるよう、現行通り5432番を公開する(本番ではDockerでDBを動かさない想定)
+- 開発中はホストのDBクライアントから確認できるよう、5432番を`127.0.0.1`に公開している
 
-## 行レベルセキュリティ(RLS)(2026-10-26に設計)
+## 行レベルセキュリティ(RLS)
 
 アプリ層の分離(`verify_user_access`でパスの`user_id`とトークンのユーザーを比べる)に加えて、DBでも本人の行だけを扱えるようにする
 (多層防御。アプリにクエリの条件の書き忘れ等があっても他人の行に届かない)。
 
-### 方針(決定)
+### 方針
 
 - **対象は`sessions`・`track_points`だけ**。認証系(`users`・`auth_sessions`・`refresh_tokens`・`email_codes`)・`outbox_emails`・
   `audit_events`は対象外(ログインの時点ではユーザーが決まっていないため、RLSと相性が悪い)
@@ -79,7 +81,7 @@
   そのロール向けのポリシー(`TO <workerのロール> USING (true)`)で許す(素通りできるテーブルと操作がマイグレーションに残り、権限も最小にできる)。
   `track_points`は`sessions`のON DELETE CASCADEで消える(外部キーの処理はRLSの対象外)ので、ポリシーは要らない
 - **`osampo_migrator`(テーブルの所有者)**: `FORCE ROW LEVEL SECURITY`を付けず、RLSの対象外のままにする。`db/seed.sql`の投入・
-  外部キーのCASCADEは今のまま動く。apiを誤ってmigratorの接続情報で起動するとRLSが黙って無効になるので、テストで
+  外部キーのCASCADEはRLSに関係なく動く。apiを誤ってmigratorの接続情報で起動するとRLSが黙って無効になるので、テストで
   「apiのロールがテーブルの所有者でないこと」「対象のテーブルでRLSが有効なこと」を確認する
 
 ### 今のユーザーを渡すタイミング
@@ -91,10 +93,10 @@
 2. `verify_user_access`: 対象のユーザーの存在を確認し、監査ログ(`admin_user_access`)を積んで**commit**(1つ目が終わる)
 3. service: `sessions`を読み書きして**commit**(2つ目)。ここで`app.user_id`が消えていると0件になり、管理者なのに404になる
 
-SQLAlchemyのセッションの`after_begin`イベントで、トランザクションが始まるたびに`set_config`する(2026-10-26に決定)。
+SQLAlchemyのセッションの`after_begin`イベントで、トランザクションが始まるたびに`set_config`する。
 認証が終わった時点でセッションに今のユーザーを記録し(`session.info`)、その時点で始まっているトランザクションにもすぐ渡す。
-以降はcommitの場所が増えても渡し忘れが起きない。管理者の経路だけ渡し直す案・1つのトランザクションにまとめる案は、
-commitの場所が変わると壊れる(後者はGETで監査ログをcommitする場所も変わる)ので採らなかった。
+以降はcommitの場所が増えても渡し忘れが起きない(管理者の経路だけ渡し直す形や、1つのトランザクションにまとめる形は、
+commitの場所が変わると壊れる)。
 
 ### ポリシー
 
@@ -119,14 +121,13 @@ app_current_user_is_admin() = EXISTS (SELECT 1 FROM users WHERE id = app_current
 - 同じテーブル・操作の複数のポリシーはOR(permissive)で組み合わさる
 - ポリシーの対象のロール名は、マイグレーションの中で設定(`APP_DB_USER`・`WORKER_DB_USER`)から読む
 
-### 既存のコードへの影響
+### RLSに合わせた処理
 
-- **POSTの`id_conflicted`**: 他人のsessionが見えなくなるので、SELECTも`INSERT ... ON CONFLICT DO NOTHING`も0件になる(以前の
-  2回のループでは`RuntimeError`(500)になっていた)。INSERTが衝突で0件になり、その後のSELECTでも見えなければ「他人の行との衝突」として
-  409 `id_conflicted`にする(一意制約はRLSに関係なく効く。他人の行の中身を見ずに判定できる)。管理者は他人の行も見えるので、
-  今まで通り`user_id`を比べて判定する
-- **404の理由のログ**: 「無い(`not_exists`)」と「他人のもの(`other_user`)」の区別をやめ、`not_found_or_not_visible`の1つにした
-  (RLSの「見えないものは存在しない」と一貫させる。区別のためにRLSを迂回する関数は作らない。2026-10-26に決定)
+- **POSTの`id_conflicted`**: 他人のsessionは見えないので、行ロック付きのSELECTも`INSERT ... ON CONFLICT DO NOTHING`も0件になる。
+  INSERTが衝突で0件になり、1回だけ探し直しても見えなければ「他人の行との衝突」として409 `id_conflicted`にする(一意制約はRLSに関係なく効くので、
+  他人の行の中身を見ずに判定できる)。管理者は他人の行も見えるので、`user_id`を比べて判定する(`app/services/session_service.py`の`register_session`)
+- **404の理由のログ**: 「無い」と「他人のもの」を区別せず、`not_found_or_not_visible`の1つにする(RLSの「見えないものは存在しない」と一貫させる。
+  区別のためにRLSを迂回する関数は作らない)
 
 ### テスト
 
@@ -137,13 +138,13 @@ app_current_user_is_admin() = EXISTS (SELECT 1 FROM users WHERE id = app_current
 - `tests/test_rls.py`: RLSが有効でapiのロールが所有者でないこと、未設定なら0件、他人の行が見えず書けないこと、管理者は全て
   扱えること(`users.role`で判定)、commitの後の渡し直し、workerのロールでの全ユーザーのパージ(マイグレーション用のロールでデータを
   commitして最後に消す)、workerのジョブが権限の範囲で動くこと、ジョブの外のテーブル・操作が拒否されること
-- `test_purge.py`のパージのロジックのテストは、今まで通り`db_session`(apiのロール。今のユーザーの行だけが見える)で行う
+- `test_purge.py`のパージのロジックのテストは、`db_session`(apiのロール。今のユーザーの行だけが見える)で行う
 
 ### workerのロール(`osampo_worker`)
 
 - 接続情報は`WORKER_DB_USER`・`WORKER_DB_PASSWORD`(`backend/.env`)。ロールはサーバー全体のものなのでmigratorでは作れず、
-  `db/init`で作る。`worker`には今の`APP_DB_*`の代わりにこちらを渡す
-- **権限は今のジョブで使うテーブル・操作だけにする(最小権限)**。`ALTER DEFAULT PRIVILEGES`は付けないので、workerが新しい
+  `db/init`で作る。`worker`には`APP_DB_*`ではなくこちらを渡す
+- **権限はジョブで使うテーブル・操作だけにする(最小権限)**。`ALTER DEFAULT PRIVILEGES`は付けないので、workerが新しい
   テーブルを使うときは、そのマイグレーションでGRANTを足す:
 
   | テーブル | 権限 | 使うジョブ |

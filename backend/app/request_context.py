@@ -1,6 +1,6 @@
 """リクエストの情報(リクエストID・送信元のIP・認証したユーザー・エラーのcode)と、アクセスログ。
 
-設計はbackend/docs/ログと監査ログ.mdの「ログ」。ASGIのミドルウェアがリクエストごとにRequestContextを作ってcontextvarに入れ、
+設計はbackend/docs/logging.mdの「ログ」。ASGIのミドルウェアがリクエストごとにRequestContextを作ってcontextvarに入れ、
 サービスの処理・ログの整形・監査ログ(app/services/audit_service.py)から参照する(引数で渡して回らずに済むように)。
 リクエストの処理の途中で分かること(認証したユーザー・エラーのcode)は、このオブジェクトの属性を書き換えて伝える
 (contextvarに入れ直すと、処理が別のタスクで動いた場合にミドルウェアから見えないため)。

@@ -1,6 +1,6 @@
 """エラーのcodeとアプリ独自の例外。
 
-レスポンスの形式・codeの意味はbackend/docs/バックエンド概要.mdの「API(共通)」を参照。
+レスポンスの形式・codeの意味はbackend/docs/overview.mdの「API(共通)」を参照。
 services層などで処理を続けられない場合はAppErrorを投げる。AppErrorはapp/error_handlers.pyのハンドラーで
 `{"code": ..., "message": ..., "details": [...]}`のJSONレスポンスに変換される(SpringのControllerAdviceに相当)。
 """

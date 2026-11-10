@@ -1,4 +1,4 @@
-"""認証・ユーザーのリクエスト/レスポンスの型と入力チェック。仕様はbackend/docs/認証.mdの「エンドポイント」。"""
+"""認証・ユーザーのリクエスト/レスポンスの型と入力チェック。仕様はbackend/docs/auth.mdの「エンドポイント」。"""
 
 import uuid
 from datetime import datetime

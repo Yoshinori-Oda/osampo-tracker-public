@@ -18,7 +18,7 @@ class OutboxEmail(Base):
 
     apiは業務のデータと同じトランザクションでここに積むだけで、送信はworkerが行う。送信に成功したら本文を消し
     (確認コードが平文で入るため)、「いつ・誰に・何を・どうなったか」の記録として残す。失敗の理由はworkerのログに出す。
-    設計はbackend/docs/メール.mdの「メール送信の基盤」。
+    設計はbackend/docs/mail.mdの「メール送信の基盤」。
     """
 
     __tablename__ = "outbox_emails"

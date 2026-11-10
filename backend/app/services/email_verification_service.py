@@ -1,6 +1,6 @@
 """メールアドレスの確認コードの送信と確認。
 
-設計はbackend/docs/メール.mdの「メールアドレスの確認コード」、仕様はbackend/docs/メール.mdの
+設計はbackend/docs/mail.mdの「メールアドレスの確認コード」、仕様はbackend/docs/mail.mdの
 「エンドポイント」。時刻はDBのclock_timestamp()を正とする。
 """
 

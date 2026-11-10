@@ -16,7 +16,7 @@
 
 以下は`backend`ディレクトリで実行する。作ったファイル(`backend/.env`・`backend/secrets/`)はコミットしない。
 
-1. `backend/.env`を作る。項目は`backend/docs/バックエンド概要.md`の「設定と秘密情報」
+1. `backend/.env`を作る。項目は`backend/docs/overview.md`の「設定と秘密情報」
 2. アクセストークンを署名するES256の鍵のペアを作る
 
    ```bash
@@ -26,7 +26,7 @@
    ```
 
 3. HTTPSの証明書をmkcertで作る(約2年で期限が切れるので、その前に作り直す。`mkcert -install`は実行しない。
-   理由は`backend/docs/HTTPSとリバースプロキシ.md`の「証明書」)
+   理由は`backend/docs/https-proxy.md`の「証明書」)
 
    ```bash
    mkdir -p secrets/tls
@@ -57,7 +57,7 @@ curl --cacert "$(mkcert -CAROOT)/rootCA.pem" https://localhost/api/
 ```
 
 - APIは`https://localhost/api`(リバースプロキシ経由)。送信したメールはMailpitの http://localhost:8025 で見る
-- サービスの構成・起動の順番・DBの初回の初期化の流れは`backend/docs/バックエンド概要.md`の「起動とヘルスチェック」
+- サービスの構成・起動の順番・DBの初回の初期化の流れは`backend/docs/overview.md`の「起動とヘルスチェック」
 - 2回目以降で依存パッケージ・Dockerfile・composeを変えていなければ、`docker compose up -d`だけでよい
 
 ### frontend
@@ -81,7 +81,7 @@ flutter run
   - app/: FastAPIのアプリ本体(config.py: 設定、db.py: DB接続、main.py: アプリ、worker.py: 定期実行、
     logging_config.py・request_context.py: ログの形式とリクエストID・アクセスログ、security.py: パスワードのハッシュ・トークン、
     mail.py: SMTPでのメールの送信、cli.py: 管理用のコマンド(シード・アカウントの停止・テストメール)、
-    routers/・schemas/・services/・models/: レイヤ。詳細は`backend/docs/バックエンド概要.md`)
+    routers/・schemas/・services/・models/: レイヤ。詳細は`backend/docs/overview.md`)
   - tests/: pytest
   - pyproject.toml・uv.lock: 依存パッケージ(uv)。Dockerfile: api・worker共通のイメージ
   - alembic.ini・migrations/: Alembicのマイグレーション。0001は旧initdb.sqlのスキーマ(とPostgREST用のストアドファンクション)を
@@ -132,19 +132,19 @@ flutter run
 | `docs/commands.md` | 場面ごとのコマンド集(準備・起動・DBの作り直し・チェック・ログ・管理用のコマンド) | コマンドを探す |
 | `docs/basic-design/` | 基本設計書(システム概要・機能一覧・画面一覧と遷移・データ設計・API一覧・認証とセキュリティ)。全体像と一覧に徹し、詳細は下記の各文書へリンクする | 全体像を掴む、機能・画面・テーブル・APIを追加/削除する(該当の一覧も更新する) |
 | `docs/design/sync.md` | 端末とサーバーにまたがる同期の設計(pull型差分同期、tombstone削除、削除と編集の競合、existence-check) | `repositories/`・同期APIを触る |
-| `frontend/docs/フロントエンド概要.md` | frontendの概要。今は認証とアカウントの端末側の設計(同期を行う条件・トークン・ローカルアカウント・ローカルDBの移行)と、実装上の注意(同期・位置情報・地図・レイアウト・Drift・依存パッケージ)の症状・原因・見分け方 | `frontend/`を触る、認証・アカウントまわりを触る、似た不具合を調べる |
+| `frontend/docs/overview.md` | frontendの概要。今は認証とアカウントの端末側の設計(同期を行う条件・トークン・ローカルアカウント・ローカルDBの移行)と、実装上の注意(同期・位置情報・地図・レイアウト・Drift・依存パッケージ)の症状・原因・見分け方 | `frontend/`を触る、認証・アカウントまわりを触る、似た不具合を調べる |
 | `frontend/docs/location-tracking.md` | RecordingPhase、timeLimit、位置情報バナー、収録開始のフォールバック、権限喪失時の強制停止 | `tracking_service.dart`・バナー・`main_page`/`recording_page`を触る |
 | `frontend/docs/background-recording.md` | バックグラウンドでの収録継続と非収録時の購読停止 | 位置情報の購読設定・ライフサイクル・権限・マニフェストを触る |
 | `frontend/docs/session-recovery.md` | 起動時の未完了セッション回収、保存/破棄画面 | 収録停止〜保存/破棄の流れを触る |
 | `frontend/docs/screens.md` | 各画面・バナー・utilsの個別仕様(編集ダイアログの挙動等) | `views/`・`widgets/`・`utils/`を触る |
 | `frontend/docs/e2e.md` | integration_testの書き方・スクリーンショット・実DBの後始末 | `integration_test/`を書く・直す |
-| `backend/docs/バックエンド概要.md` | backendの構成の選定理由・主な決定事項・実装方針・設定と秘密情報・起動の仕組み・テスト | `backend/`を触る |
-| `backend/docs/DBとマイグレーション.md` | スキーマとマイグレーション、DBのロールと接続、行レベルセキュリティ(RLS) | テーブル・マイグレーション・DBの権限を触る |
-| `backend/docs/同期API.md` | 同期APIのサーバー側の実装、削除済みのセッションのパージ(worker) | 同期APIを触る |
-| `backend/docs/認証.md` | 認証(パスワード・トークン)、ログインの試行回数の制限 | 認証・アカウントまわりを触る |
-| `backend/docs/メール.md` | メール送信の基盤(outbox + worker)、メールアドレスの確認コード | メール送信を触る |
-| `backend/docs/ログと監査ログ.md` | アクセスログ・アプリのログ・監査ログ | ログ・監査ログを触る |
-| `backend/docs/HTTPSとリバースプロキシ.md` | リバースプロキシ(nginx)・証明書(mkcert)・TLSの設定・送信元のIPとリクエストID・流量などの上限 | `backend/proxy/`・composeのポート・証明書・接続先のURLを触る、アプリがAPIにつながらない |
+| `backend/docs/overview.md` | backendの構成の選定理由・主な決定事項・実装方針・設定と秘密情報・起動の仕組み・テスト | `backend/`を触る |
+| `backend/docs/database.md` | スキーマとマイグレーション、DBのロールと接続、行レベルセキュリティ(RLS) | テーブル・マイグレーション・DBの権限を触る |
+| `backend/docs/sync-api.md` | 同期APIのサーバー側の実装、削除済みのセッションのパージ(worker) | 同期APIを触る |
+| `backend/docs/auth.md` | 認証(パスワード・トークン)、ログインの試行回数の制限 | 認証・アカウントまわりを触る |
+| `backend/docs/mail.md` | メール送信の基盤(outbox + worker)、メールアドレスの確認コード | メール送信を触る |
+| `backend/docs/logging.md` | アクセスログ・アプリのログ・監査ログ | ログ・監査ログを触る |
+| `backend/docs/https-proxy.md` | リバースプロキシ(nginx)・証明書(mkcert)・TLSの設定・送信元のIPとリクエストID・流量などの上限 | `backend/proxy/`・composeのポート・証明書・接続先のURLを触る、アプリがAPIにつながらない |
 
 ## 5. 開発・運用ルール
 
@@ -181,7 +181,8 @@ flowchart TD
 
 ### コーディング規約
 
-- 現状はlinterは未導入(frontend)。backendはruffの既定のルールに、DTZ(タイムゾーンなしの日時の指摘)を加えたもの(`pyproject.toml`の`[tool.ruff.lint]`)
+- lint: frontendは`flutter_lints`のルール(`frontend/analysis_options.yaml`。`flutter analyze`で確かめる)。backendはruffの既定のルールに、
+  DTZ(タイムゾーンなしの日時の指摘)を加えたもの(`pyproject.toml`の`[tool.ruff.lint]`)
 - Dartのインデントは2文字、SQLのインデントは4文字で行い、Dartではリスト項目の末尾にも`,`を入れる
 - 端末のログは`utils/app_log.dart`の`appLog`で出す(`print`は使わない)
 
@@ -237,11 +238,11 @@ flowchart LR
   通信は`[http]`の行に応答のリクエストID(`X-Request-ID`。リバースプロキシが作る)が出るので、backendのログ
   (`docker compose logs proxy api | grep <ID>`)と突き合わせられる。応答が届かなかったリクエストはIDが無いので、時刻でproxyのログを探す
 - backendのログは`docker compose logs proxy`・`docker compose logs api`・`docker compose logs worker`で見る(key=value。`LOG_FORMAT=json`でJSON)。
-  3つのログ(アクセス・アプリ・監査)の役割は`backend/docs/ログと監査ログ.md`の「ログ」
+  3つのログ(アクセス・アプリ・監査)の役割は`backend/docs/logging.md`の「ログ」
 - 複数端末での同期テストは、複数のシミュレータ/実機で同じユーザー(`app.cli seed-dev`のテストユーザー
   `testuser@example.com`等)にログインして行う。同期はメールアドレスが確認済みのユーザーでしか行われない
-- アプリがAPIにつながらないときは`backend/docs/HTTPSとリバースプロキシ.md`の「つながらないとき」、backendの挙動がおかしいときは
-  `backend/docs/バックエンド概要.md`の「開発環境での注意」
+- アプリがAPIにつながらないときは`backend/docs/https-proxy.md`の「つながらないとき」、backendの挙動がおかしいときは
+  `backend/docs/overview.md`の「開発環境での注意」
 
 ### CI・Dependabot
 
@@ -292,7 +293,7 @@ flowchart LR
 - 作業はブランチを切って行い、並行する作業はgit worktreeで分ける。worktreeごとに依存・生成物が別になるため、
   作った直後に`run_checks.sh <run_id> pubget`(テーブル定義を変えた場合は`codegen`も)を実行する。backendの`docker compose`は
   ディレクトリ名から同じプロジェクト名(`backend`)になるので、メインのチェックアウトとworktreeで同時に起動しない
-  (`backend/docs/バックエンド概要.md`の「開発環境での注意」)
+  (`backend/docs/overview.md`の「開発環境での注意」)
 - commitメッセージはConventional Commitsに従う
 - 1PR1目的を基本とし、無関係な変更を混在させない
 - mainへの直接のpushは禁止。ブランチをpushしてPRを作り、CIが通ってからマージする。CIで見つかった問題は同じブランチに

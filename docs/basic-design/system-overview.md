@@ -1,7 +1,7 @@
 # システム概要
 
-基本設計書の1本目。システム全体の構成と主なデータの流れをまとめる。2026-10-15時点のmainの実装を正として書き(リバースプロキシは2026-11-09の追加を反映済み)、
-未実装のものは「予定」と明記する。個々の仕組みの詳細は末尾の「関連文書」から辿る。
+基本設計書の1本目。システム全体の構成と主なデータの流れをまとめる。2026-11-10時点のmainの実装を正とする。
+未実装の機能は`features.md`の「予定の機能」。個々の仕組みの詳細は末尾の「関連文書」から辿る。
 
 ## 目的
 
@@ -26,7 +26,7 @@ flowchart LR
         proxy["proxy<br/>nginx<br/>127.0.0.1:443 (HTTPS)"]
         api["api<br/>FastAPI + uvicorn<br/>:8080 (composeの中だけ)"]
         worker["worker<br/>APScheduler"]
-        db[("db<br/>PostgreSQL 16 + PostGIS")]
+        db[("db<br/>PostgreSQL 16 + PostGIS 3.4")]
         mailpit["mailpit<br/>開発用SMTP<br/>Web UI 127.0.0.1:8025"]
         proxy -- "HTTP /api/" --> api
         api --> db
@@ -47,10 +47,10 @@ flowchart LR
 | モバイルアプリ | 位置情報の収録、記録の閲覧・編集・統計、ログイン・登録、サーバーとの同期 | `frontend/`(Flutter / Riverpod) |
 | ローカルDB | 収録したセッションと位置情報の点を保存する。ログインしたユーザーごとにデータを分ける | `frontend/lib/database/`(Drift / SQLite) |
 | トークンの保存領域 | アクセストークン・リフレッシュトークンを保存する。パスワードは端末に保存しない | `frontend/lib/auth/auth_storage.dart`(flutter_secure_storage) |
-| proxy | リバースプロキシ。TLSを終端してHTTPSで公開し、`/api/`だけをapiへ転送する。送信元のIP・リクエストIDの付与、流量・大きさ・時間の上限、アクセスログ | `backend/proxy/`(nginx)。詳細は`backend/docs/HTTPSとリバースプロキシ.md` |
+| proxy | リバースプロキシ。TLSを終端してHTTPSで公開し、`/api/`だけをapiへ転送する。送信元のIP・リクエストIDの付与、流量・大きさ・時間の上限、アクセスログ | `backend/proxy/`(nginx)。詳細は`backend/docs/https-proxy.md` |
 | api | REST APIを提供する(認証・ユーザー・セッションの同期・ヘルスチェック) | `backend/app/`(FastAPI)。`main.py`・`routers/` |
-| worker | 定期実行のジョブ。outboxのメールの送信(5秒ごと)と、期限切れデータのパージ(24時間ごと) | `backend/app/worker.py`。apiと同じイメージで起動コマンドだけ変える。ジョブの重複を避けるため1つだけ起動する |
-| db | サーバー側のデータ(ユーザー・ログイン状態・セッション・位置情報の点・メール)を保存する | PostgreSQL 16 + PostGIS。スキーマはAlembic(`backend/migrations/`)で管理 |
+| worker | 定期実行のジョブ。outboxのメールの送信(5秒ごと)と、期限切れデータのパージ(24時間ごと)。DBにはworker専用のロールで接続する | `backend/app/worker.py`。apiと同じイメージで起動コマンドだけ変える。ジョブの重複を避けるため1つだけ起動する |
+| db | サーバー側のデータ(ユーザー・ログイン状態・セッション・位置情報の点・メール・監査ログ)を保存する | PostgreSQL 16 + PostGIS 3.4。スキーマはAlembic(`backend/migrations/`)で管理 |
 | mailpit | 開発用のSMTP受信サーバー。メールを外部に出さず、Web UIで確認する | composeのサービス。本番相当のSMTPは未定 |
 | 地図タイル | 地図の背景画像 | OpenStreetMapのタイルサーバーを端末から直接参照する(APIキー不要) |
 
@@ -97,14 +97,14 @@ sequenceDiagram
 
 apiはメールを直接送らず、DBのoutbox(`outbox_emails`)に積むだけにする。workerが5秒ごとにoutboxを確認してSMTPで送る。
 apiの応答がSMTPサーバーの遅延・障害の影響を受けず、送信に失敗しても再試行できるようにするため。
-現在メールを送るのは、メールアドレスの確認コード(6桁)だけ。
+送るメールは、メールアドレスの確認コード(6桁)と、パスワードの変更の通知。
 
 ## 技術スタック
 
 | 区分 | 技術 |
 |---|---|
-| モバイルアプリ | Dart / Flutter、Riverpod(状態管理)、Drift(ローカルDB)、geolocator(位置情報)、flutter_map + latlong2(地図)、fl_chart(グラフ)、http(API通信)、flutter_secure_storage(トークンの保存)、permission_handler(通知の権限) |
-| APIサーバー | Python 3.12 / FastAPI、uvicorn、Pydantic・pydantic-settings、SQLAlchemy 2(非同期)+ psycopg 3、GeoAlchemy2、PyJWT(ES256)、pwdlib(Argon2)、APScheduler |
+| モバイルアプリ | Dart / Flutter、Riverpod(状態管理)、Drift(ローカルDB)、geolocator(位置情報)、flutter_map + latlong2(地図)、fl_chart(グラフ)、http(API通信)、flutter_secure_storage(トークンの保存)、permission_handler(通知の権限)、holiday_jp(統計の祝日の表示)、intl・uuid |
+| APIサーバー | Python 3.12 / FastAPI、uvicorn、Pydantic・pydantic-settings、SQLAlchemy 2(非同期)+ psycopg 3、GeoAlchemy2、PyJWT(ES256)、pwdlib(Argon2)、email-validator、APScheduler |
 | DB | PostgreSQL 16 + PostGIS 3.4、Alembic(マイグレーション) |
 | 開発・テスト | flutter_test・integration_test、pytest・ruff、uv(Pythonの依存パッケージ)、Docker Compose |
 
@@ -114,7 +114,7 @@ apiの応答がSMTPサーバーの遅延・障害の影響を受けず、送信�
 - バックエンドは開発者のPC(ホスト)の`docker compose`で起動する。ホストに公開しているポートは proxy `443`(HTTPS)・db `5432`・
   mailpit `8025`で、いずれもホストのループバック(`127.0.0.1`)だけ。apiはホストに公開せず、proxyを通してだけ使う
 - アプリはホストの`flutter run`で、iOSシミュレータに入れて動かす。接続先のAPIは既定で`https://localhost/api`。証明書はmkcert
-  (手元に作るCA)で発行し、シミュレータにCAを信頼させる。Androidエミュレータ・実機はCAを信頼させる対応をしていないので、今は使わない
+  (手元に作るCA)で発行し、シミュレータにCAを信頼させる。Androidエミュレータ・実機はCAを信頼させる対応をしていないので、使っていない
 - 開発の流れ・ローカルでのテスト・CIは`docs/development.md`
 - ストアでの公開はしていない
 
@@ -143,13 +143,18 @@ apiの応答がSMTPサーバーの遅延・障害の影響を受けず、送信�
 | 文書 | 内容 |
 |---|---|
 | `docs/design/sync.md` | 同期・削除(tombstone)・競合の解決 |
+| `docs/development.md` | 開発ガイド(開発環境・起動方法・開発/運用ルール) |
+| `docs/commands.md` | コマンド集 |
+| `frontend/docs/overview.md` | 認証とアカウントの端末側の設計・frontendの実装上の注意 |
 | `frontend/docs/location-tracking.md` | 収録の状態遷移・位置情報のバナー |
 | `frontend/docs/background-recording.md` | バックグラウンドでの収録 |
-| `frontend/docs/session-recovery.md` | 起動時の未完了セッションの回収 |
-| `backend/docs/バックエンド概要.md` | バックエンドの構成・主な決定事項・実装方針・設定・起動・テスト |
-| `backend/docs/DBとマイグレーション.md` | マイグレーション・DBのロール・行レベルセキュリティ(RLS) |
-| `backend/docs/同期API.md` | 同期APIのサーバー側の実装・パージ |
-| `backend/docs/認証.md` | 認証・ログインの試行回数の制限 |
-| `backend/docs/メール.md` | メール送信の基盤・メールアドレスの確認コード |
-| `backend/docs/ログと監査ログ.md` | アクセスログ・アプリのログ・監査ログ |
-| `backend/docs/HTTPSとリバースプロキシ.md` | リバースプロキシ(nginx)・証明書・TLSの設定・送信元のIPとリクエストID・流量などの上限 |
+| `frontend/docs/session-recovery.md` | 起動時の未完了セッションの回収・保存/破棄画面 |
+| `frontend/docs/screens.md` | 画面・UI部品の仕様 |
+| `frontend/docs/e2e.md` | E2Eテストの書き方 |
+| `backend/docs/overview.md` | バックエンドの構成・主な決定事項・実装方針・設定・起動・テスト |
+| `backend/docs/database.md` | マイグレーション・DBのロール・行レベルセキュリティ(RLS) |
+| `backend/docs/sync-api.md` | 同期APIのサーバー側の実装・パージ |
+| `backend/docs/auth.md` | 認証・ログインの試行回数の制限 |
+| `backend/docs/mail.md` | メール送信の基盤・メールアドレスの確認コード |
+| `backend/docs/logging.md` | アクセスログ・アプリのログ・監査ログ |
+| `backend/docs/https-proxy.md` | リバースプロキシ(nginx)・証明書・TLSの設定・送信元のIPとリクエストID・流量などの上限 |

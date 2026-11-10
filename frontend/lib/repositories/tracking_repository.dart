@@ -53,7 +53,7 @@ class UserSyncStateStore implements SyncStateStore {
   Future<void> clearLastSyncedAt() => _db.setLastSyncedAt(_userId, null);
 }
 
-/// ローカルのDB(Drift)とAPIサーバー(backend/docs/同期API.md)の同期。
+/// ローカルのDB(Drift)とAPIサーバー(backend/docs/sync-api.md)の同期。
 /// 同期の設計はdocs/design/sync.mdを参照
 class TrackingRepository {
   final AppDatabase _db;
@@ -72,7 +72,7 @@ class TrackingRepository {
   bool isSyncing = false;
 
   // APIの接続先(backendのリバースプロキシ)。証明書はmkcertで作り、iOSシミュレータにCAを入れて使う。
-  // Androidエミュレータ・実機はCAを信頼させる対応をしていないので、今は使えない(backend/docs/HTTPSとリバースプロキシ.md)。
+  // Androidエミュレータ・実機はCAを信頼させる対応をしていないので、今は使えない(backend/docs/https-proxy.md)。
   // 切り替えるときは`flutter run --dart-define=API_BASE_URL=https://<ホスト名>/api`
   static const String defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',

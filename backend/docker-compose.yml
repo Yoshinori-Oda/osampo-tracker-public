@@ -1,4 +1,4 @@
-# DBの接続情報は同じディレクトリの.env(コミットしない)から読み込む。項目はbackend/docs/バックエンド概要.mdの「設定と秘密情報」を参照。
+# DBの接続情報は同じディレクトリの.env(コミットしない)から読み込む。項目はbackend/docs/overview.mdの「設定と秘密情報」を参照。
 # 各サービスには必要な接続情報だけを渡す(例: workerにはマイグレーション用のロールを渡さない)
 
 # ログはDockerのjson-fileに溜まるので、ファイルの大きさと数に上限を付ける(既定では無制限に増える)
@@ -9,7 +9,7 @@ x-logging: &default-logging
     max-file: "3"
 
 services:
-  # リバースプロキシ。TLSを終端してHTTPSで公開し、/api/ だけをapiへ転送する(backend/docs/HTTPSとリバースプロキシ.md)。
+  # リバースプロキシ。TLSを終端してHTTPSで公開し、/api/ だけをapiへ転送する(backend/docs/https-proxy.md)。
   # 外からの通信はここだけが受ける。実機を使わないので、ホストのループバックだけで待ち受ける
   proxy:
     image: nginx:1.30-alpine
@@ -76,7 +76,7 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload", "--no-access-log",
               "--forwarded-allow-ips", "172.31.89.10"]
     environment:
-      # ログの形式(text・json)とレベル。項目はbackend/docs/ログと監査ログ.mdの「ログ」
+      # ログの形式(text・json)とレベル。項目はbackend/docs/logging.mdの「ログ」
       LOG_FORMAT: ${LOG_FORMAT:-text}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -90,7 +90,7 @@ services:
       WORKER_DB_USER: ${WORKER_DB_USER}
       WORKER_DB_PASSWORD: ${WORKER_DB_PASSWORD}
       PURGE_RETENTION_DAYS: ${PURGE_RETENTION_DAYS:-90}
-      # メールアドレスの確認コード(省略可)。項目はbackend/docs/メール.mdの「メールアドレスの確認コード」
+      # メールアドレスの確認コード(省略可)。項目はbackend/docs/mail.mdの「メールアドレスの確認コード」
       EMAIL_CODE_TTL_MINUTES: ${EMAIL_CODE_TTL_MINUTES:-10}
       EMAIL_CODE_MAX_FAILED_ATTEMPTS: ${EMAIL_CODE_MAX_FAILED_ATTEMPTS:-5}
       EMAIL_CODE_RESEND_INTERVAL_SECONDS: ${EMAIL_CODE_RESEND_INTERVAL_SECONDS:-60}
@@ -127,7 +127,7 @@ services:
       WORKER_DB_PASSWORD: ${WORKER_DB_PASSWORD}
       PURGE_RETENTION_DAYS: ${PURGE_RETENTION_DAYS:-90}
       PURGE_INTERVAL_HOURS: ${PURGE_INTERVAL_HOURS:-24}
-      # メール送信(apiはoutboxに積むだけなので、SMTPの設定はworkerにだけ渡す)。既定はmailpit。項目はbackend/docs/メール.md
+      # メール送信(apiはoutboxに積むだけなので、SMTPの設定はworkerにだけ渡す)。既定はmailpit。項目はbackend/docs/mail.md
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USERNAME: ${SMTP_USERNAME:-}

@@ -1,5 +1,5 @@
-"""自分のアカウント(/api/users/me)。仕様はbackend/docs/認証.mdの「エンドポイント」と
-backend/docs/メール.mdの「エンドポイント」。
+"""自分のアカウント(/api/users/me)。仕様はbackend/docs/auth.mdの「エンドポイント」と
+backend/docs/mail.mdの「エンドポイント」。
 
 将来、管理者向けに他ユーザーを操作する機能を作るときは、/api/users/{user_id} のendpointを別に追加する。
 """

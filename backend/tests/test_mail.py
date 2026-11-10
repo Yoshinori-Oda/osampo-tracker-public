@@ -1,6 +1,6 @@
 """メールの送信基盤(app/mail.py・app/services/mail_service.py)のテスト。SMTPには接続しない。
 
-設計はbackend/docs/メール.mdの「メール送信の基盤」。
+設計はbackend/docs/mail.mdの「メール送信の基盤」。
 """
 
 import smtplib

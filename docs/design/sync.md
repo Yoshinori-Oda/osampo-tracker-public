@@ -1,8 +1,9 @@
 # 同期・削除の設計
 
+2026-11-10時点のmainの実装を正とする。
 関連: `frontend/lib/repositories/tracking_repository.dart`・`backend/app/services/session_service.py`・
-`backend/app/services/purge_service.py`。APIの処理は`backend/docs/同期API.md`、同期を行う条件(ログイン・メールアドレスの確認)は
-`frontend/docs/フロントエンド概要.md`の「認証とアカウント」。
+`backend/app/services/purge_service.py`。APIの処理は`backend/docs/sync-api.md`、同期を行う条件(ログイン・メールアドレスの確認)は
+`frontend/docs/overview.md`の「認証とアカウント」。
 
 このアプリは「複数端末・同一ユーザーでの同時操作は想定しない」前提で、シンプルな
 pull型差分同期(`updated_at`ベース)を採用している。設計の要点:
@@ -24,7 +25,7 @@ pull型差分同期(`updated_at`ベース)を採用している。設計の要�
   更新することで、他端末が通常の差分pullの中で「削除された」(`id`と`deleted_at`だけの要素)ことを検知できるようにしている。
   ローカルの`deletedUnsynced`の行は、DELETEの成功が確認できた時点でそのまま物理削除してよい
 - **リモートのtombstone行は長周期パージ**する(`worker`、24時間ごと)。他端末が確実にtombstoneを受け取れるよう、
-  削除してから90日経ったものだけを物理削除する。90日より前に同期したきりの端末にはGETが`request_existence_check`を
+  削除してから90日経ったものだけを物理削除する(どちらも既定値。`backend/docs/sync-api.md`の「パージ(worker)」)。90日より前に同期したきりの端末にはGETが`request_existence_check`を
   返すので、端末は同期済みのセッションのidで突き合わせ(existence-check)を行い、サーバーに無いものを消す。
   突き合わせが成功するまで`last_synced_at`は更新しない(途中で失敗しても、次回のGETで再び突き合わせが行われるように)
   - 送るIDは、同期済み(`synced`)のセッションのidから、今回のGETのレスポンスに含まれていたidを除いたもの。未同期のセッションは送らない

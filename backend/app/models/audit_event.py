@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base
 
 # 出来事の種類。追加してもマイグレーションは要らない(CHECK制約を付けていない)。
-# 一覧と記録する項目はbackend/docs/ログと監査ログ.mdの「監査ログ」
+# 一覧と記録する項目はbackend/docs/logging.mdの「監査ログ」
 EVENT_SIGNUP = "signup"
 EVENT_LOGIN_SUCCEEDED = "login_succeeded"
 EVENT_LOGIN_FAILED = "login_failed"  # reasonにinvalid_credentials・account_disabled
@@ -33,7 +33,7 @@ class AuditEvent(Base):
     (全てのリクエストの記録はアクセスログの役割)。追記のみで、更新しない。
     user_idには外部キーを付けない(アカウントの削除の記録を、ユーザーを消した後も残すため)。アカウントを削除したときは、
     そのユーザーの記録をサービスの処理で消してから削除の記録を書く。
-    設計はbackend/docs/ログと監査ログ.mdの「監査ログ」。
+    設計はbackend/docs/logging.mdの「監査ログ」。
     """
 
     __tablename__ = "audit_events"

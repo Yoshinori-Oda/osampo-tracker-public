@@ -1,4 +1,4 @@
-"""同期API(/api/users/{user_id}/sessions)のテスト。backend/docs/同期API.mdの「エンドポイント」の処理の手順ごとに確認する。
+"""同期API(/api/users/{user_id}/sessions)のテスト。backend/docs/sync-api.mdの「エンドポイント」の処理の手順ごとに確認する。
 
 各テストはconftestのdb_sessionのトランザクションの中で動き、最後にロールバックされる。
 """

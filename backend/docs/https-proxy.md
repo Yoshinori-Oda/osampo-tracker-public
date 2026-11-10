@@ -1,6 +1,6 @@
 # HTTPSとリバースプロキシの詳細設計
 
-2026-11-09に設計。apiの前にリバースプロキシ(nginx)を置き、TLSを終端してHTTPSで公開する。あわせて、送信元のIP・リクエストIDの扱いと、
+2026-11-10時点のmainの実装を正とする。apiの前にリバースプロキシ(nginx)を置き、TLSを終端してHTTPSで公開する。あわせて、送信元のIP・リクエストIDの扱いと、
 流量・大きさ・時間の上限をプロキシに持たせる。概要は`docs/basic-design/security.md`の「通信」、構成は`docs/basic-design/system-overview.md`。
 
 **この構成は開発環境のためのもの**。本番環境はクラウドのサービス(ロードバランサーとマネージドの証明書等)に置き換える想定で、
@@ -76,9 +76,9 @@ mkcert -cert-file secrets/tls/cert.pem -key-file secrets/tls/key.pem localhost 1
 ### クライアントに信頼させる
 
 - iOSシミュレータ: `xcrun simctl keychain booted add-root-cert "$(mkcert -CAROOT)/rootCA.pem"`。シミュレータを作り直したり、
-  初期化したりしたら入れ直す。アプリのHTTP通信(dart:io)がiOSの信頼ストアで証明書を検証すること(keychainに入れれば通ること)は、
-  実装後の最初のE2Eで確かめる
-- Androidエミュレータ: **今は対応しない**。Android 7以降は、ユーザーが入れたCAをアプリが既定では信頼しない。対応するときは、
+  初期化したりしたら入れ直す。アプリのHTTP通信(dart:io)はiOSの信頼ストアで証明書を検証するので、keychainに入れれば通る
+  (iOSシミュレータのE2Eで、HTTPS越しのログイン・同期を確かめている)
+- Androidエミュレータ: **対応していない**。Android 7以降は、ユーザーが入れたCAをアプリが既定では信頼しない。対応するときは、
   `network_security_config.xml`の`<debug-overrides>`でデバッグビルドだけユーザーのCAを信頼させる(dart:ioがそれに従うかの確認も要る)か、
   デバッグビルドだけ`SecurityContext`に開発用のCAを読み込ませる
 - **証明書の検証を無効にしない**(`badCertificateCallback`で全て許す等)。リリースビルドに紛れ込む事故が典型
@@ -94,7 +94,7 @@ mkcert -cert-file secrets/tls/cert.pem -key-file secrets/tls/key.pem localhost 1
   脆弱性が見つかってきた)
 - **HSTS**(`Strict-Transport-Security: max-age=63072000`)を付ける。ブラウザに「このホストには今後HTTPSでしかつながない」と覚えさせる
   ヘッダーで、ネイティブのアプリには効かないが、ブラウザで開かれたときと本番に向けて付けておく。開発のホスト名は`localhost`なので、
-  ブラウザが覚えると他のポートの開発用のサーバーまでHTTPSを強いられる。今は`mkcert -install`をしない(Macのブラウザがこの証明書を
+  ブラウザが覚えると他のポートの開発用のサーバーまでHTTPSを強いられる。`mkcert -install`をしない(Macのブラウザがこの証明書を
   信頼しない)ので、ブラウザはHSTSを無視する
 - **OCSPステープリングは使わない**。OCSPは証明書が失効していないかをCAに問い合わせる仕組みで、ステープリングはその応答をサーバーが
   代わりに取ってTLSのやりとりに添えるもの。mkcertの証明書にはOCSPの問い合わせ先が無い(本番の候補のLet's EncryptもOCSPの提供を
@@ -109,19 +109,19 @@ mkcert -cert-file secrets/tls/cert.pem -key-file secrets/tls/key.pem localhost 1
   | ヘッダー | 値 | 意味 |
   |---|---|---|
   | `X-Forwarded-For` | proxyに接続してきた送信元のIP(`$remote_addr`)だけ | apiから見た接続元はproxyなので、本当の送信元を伝える。クライアントの値に追記する(`$proxy_add_x_forwarded_for`)と、偽の値が先頭に残る |
-  | `X-Forwarded-Proto` | `https` | クライアントとproxyの間がHTTPSだったことを伝える |
+  | `X-Forwarded-Proto` | `$scheme`(443番だけで待ち受けるので常に`https`) | クライアントとproxyの間がHTTPSだったことを伝える |
   | `Host` | クライアントが送った`Host` | apiが組み立てるURLのホスト名を、クライアントが接続したものにする |
   | `X-Request-ID` | proxyが作ったID(下記「リクエストID」) | |
 
 - apiは、**proxyから届いたときだけ**これらのヘッダーを信用する。uvicornの`--forwarded-allow-ips`にproxyのIPだけを指定する
   (uvicornは指定したIPからの接続でだけ、`X-Forwarded-For`・`X-Forwarded-Proto`で送信元のIP・スキームを置き換える)。
   composeのネットワークのサブネットを固定し、proxyに固定のIPを割り当てて、そのIPを指定する
-  - apiのアプリ(`app/request_context.py`)は今までどおり接続の送信元(`scope["client"]`)を使う。uvicornが置き換えた後の値なので、
+  - apiのアプリ(`app/request_context.py`)は接続の送信元(`scope["client"]`)を使う。uvicornが置き換えた後の値なので、
     アプリの変更は要らない
 - `X-Forwarded-Proto`が要る理由: apiが自分のURLを組み立てるとき(FastAPIが末尾の`/`を補うリダイレクトの`Location`等)、
   apiから見た接続はHTTPなので`http://...`になる。アプリがそれに従うと、待ち受けていない80番へつなぎに行って失敗する。
   `X-Forwarded-Proto: https`を信用させると、`https://...`で組み立てる
-- 将来、proxyの前にクラウドのロードバランサーが入ると、proxyに接続してくるのはロードバランサーになる。そのときは、proxyで
+- proxyの前にクラウドのロードバランサーを置く構成では、proxyに接続してくるのはロードバランサーになる。その場合は、proxyで
   ロードバランサーのIPを信頼し(nginxの`set_real_ip_from`・`real_ip_header`)、`X-Forwarded-For`の右から信頼できるプロキシの数だけ
   飛ばした値を送信元とする
 - 開発環境(Docker Desktop)では、ホストから公開したポートへの接続の送信元は、Dockerのゲートウェイ等のIPになり、全てのクライアントが
@@ -130,7 +130,7 @@ mkcert -cert-file secrets/tls/cert.pem -key-file secrets/tls/key.pem localhost 1
 ### リクエストID
 
 - **proxyがリクエストごとにIDを作る**(nginxの`$request_id`。32桁の16進数)。クライアントが送った`X-Request-ID`は無視し、apiへ転送する
-  ときに上書きする。apiのアプリは、届いた`X-Request-ID`を今までどおり使う(形式は英数字と`-`の8〜64文字なので、proxyのIDは通る。
+  ときに上書きする。apiのアプリは、届いた`X-Request-ID`を使う(形式は英数字と`-`の8〜64文字なので、proxyのIDは通る。
   apiに直接つなげるのはcomposeのネットワークの中だけ)
 - proxyのアクセスログ・apiのアクセスログ・アプリのログ・監査ログが同じIDになり、proxyで止めたリクエスト(429・413等。apiに届かない)も
   proxyのログでIDが分かる
@@ -152,7 +152,7 @@ mkcert -cert-file secrets/tls/cert.pem -key-file secrets/tls/key.pem localhost 1
 
 proxyとapiの両方で取る。役割を分ける。
 
-| | proxyのアクセスログ | apiのアクセスログ(`ログと監査ログ.md`の「ログ」) |
+| | proxyのアクセスログ | apiのアクセスログ(`logging.md`の「ログ」) |
 |---|---|---|
 | 説明すること | 通信として何が来て、proxyがどう応えたか(apiに届かなかったものも含む) | apiがリクエストをどう処理したか |
 | 主な項目 | 時刻・`request_id`・送信元のIP・メソッド・パスの型・ステータス・apiのステータス・受信/送信のバイト数・全体の時間・apiの応答時間・TLSのバージョン | `request_id`・`user_id`・IP・メソッド・パスの型・ステータス・`code`・時間 |
@@ -160,7 +160,7 @@ proxyとapiの両方で取る。役割を分ける。
 - 形式は、apiのログと同じkey=valueの1行(nginxの`log_format`で組む)
 - **パスは「パスの型」に置き換えて残し、クエリ文字列は残さない**(apiのアクセスログと同じ方針。パスには`user_id`・`session_id`が、
   クエリには同期の日時が入るため)。nginxの`map`で、`user_id`・`session_id`を含むパスを`/api/users/{user_id}/sessions/{session_id}`の
-  ような型に置き換える。型に当てはまらないパスはそのまま残す(`/api/`の外を探られた等が分かるように)
+  ような型に置き換える。型に当てはまらないパスも、中のUUID(2つまで)を`{id}`に伏せ、それ以外はそのまま残す(`/api/`の外を探られた等が分かるように)
 - リクエストのbody・`Authorization`等のヘッダーは残さない
 - 保持: IPは個人関連情報として扱い、**90日**とする(tombstone・監査ログと同じ)。開発環境では、Dockerのjson-fileのログ
   (サービスごとに10MB×3ファイル。composeの`x-logging`)のまま。日数での保持は、本番でログを集める先(CloudWatch Logs等)で設定する
@@ -170,7 +170,7 @@ proxyとapiの両方で取る。役割を分ける。
 ### 流量の制限(送信元のIP単位)
 
 **DoS(大量のリクエストでサーバーを止める攻撃)を弾くためだけ**に置き、普段の利用で引っかからない値にする。ログインの推測などの
-業務の意味がある回数の制限は、今までどおりapiが行う(メールアドレス・ユーザー単位)。
+業務の意味がある回数の制限は、apiが行う(メールアドレス・ユーザー単位)。
 
 | 対象 | 上限(IPごと) | 考え方 |
 |---|---|---|
@@ -181,7 +181,7 @@ proxyとapiの両方で取る。役割を分ける。
 - 上限を超えたら429を返す(nginxの既定は503なので`limit_req_status 429`を指定する)。bodyはAPIのエラーの形式で`code`は
   `too_many_requests`、`Retry-After: 1`を付ける(アプリの既存の429の扱いがそのまま使える)
 - 超えた分は待たせずに断る(`nodelay`)。待たせると接続を持ち続けるので、DoSのときにproxyの資源を使われる
-- 値は目安で、負荷試験(Issue #12)の結果で見直す
+- 値は目安(負荷試験はしていない)
 
 ### bodyの大きさ
 
@@ -234,9 +234,9 @@ apiに届く前・届かなかったときのエラーも、APIのエラーの�
 | 413 | `payload_too_large` | bodyが10MiBを超えた |
 | 429 | `too_many_requests` | 流量の制限を超えた(`Retry-After: 1`) |
 | 502・504 | `service_unavailable` | apiにつながらない・apiの応答が`proxy_read_timeout`までに来ない |
-| その他(400等) | `http_error` | 壊れたリクエスト等 |
+| 400 | `http_error` | 壊れたリクエスト等。これ以外のステータス(408・414・431等)は、nginxの既定の応答(HTML)になる |
 
-`service_unavailable`の扱いは`backend/docs/バックエンド概要.md`の「エラーレスポンス」。アプリは他の5xxと同じく、同期を後で再試行する。
+`service_unavailable`の扱いは`backend/docs/overview.md`の「エラーレスポンス」。アプリは他の5xxと同じく、同期を後で再試行する。
 
 ### 応答のヘッダー
 
@@ -266,7 +266,7 @@ apiに届く前・届かなかったときのエラーも、APIのエラーの�
 
 ## ヘルスチェック
 
-- apiは今までどおり、apiのコンテナの中から`http://localhost:8080/health`を確かめる(proxyを通さない)
+- apiは、apiのコンテナの中から`http://localhost:8080/health`を確かめる(proxyを通さない)
 - proxyは、コンテナの中のループバックだけで待ち受ける確認用の口(`127.0.0.1:8081`の`/healthz`。204を返すだけ)を設け、composeの
   `healthcheck`でコンテナの中から確かめる。ホストには公開しない
 - proxyは`depends_on`でapiの`healthcheck`が通ってから起動する(起動直後の502を避ける)
@@ -274,9 +274,9 @@ apiに届く前・届かなかったときのエラーも、APIのエラーの�
 
 ## テスト・確認の方法
 
-- **ホスト側**: `backend/scripts/run_checks.sh`に`https`のstepを加える(サービスが起動済みの前提)。`curl`で次を確かめ、結果を`SUMMARY.md`に出す
+- **ホスト側**: `backend/scripts/run_checks.sh`の`https`のstep(サービスが起動済みの前提)。`curl`で次を確かめ、結果を`SUMMARY.md`に出す
   - mkcertのCAで証明書を検証して、`https://localhost/api/`につながる(apiのエラーの形式の応答が返る)。`127.0.0.1`でもつながる
-  - TLS 1.1以下ではつながらない。80番・8080番にはつながらない
+  - TLS 1.1以下ではつながらない。HTTP/2を求めてもHTTP/1.1で応える。80番・8080番にはつながらない
   - `/docs`・`/health`は404(`not_found`)
   - 応答に`X-Request-ID`・HSTS・`nosniff`・`no-store`が付き、`Server`にバージョンが無い
   - クライアントが送った`X-Request-ID`が使われない
@@ -284,13 +284,13 @@ apiに届く前・届かなかったときのエラーも、APIのエラーの�
   - 10MiBを超えるbodyは413(`payload_too_large`)
   - 証明書の有効期限を表示する
   - 流量の制限(429)は、他の確かめるべきことに影響しないよう、最後に確かめる
-- **pytest**: apiのアプリは変えないので、新しいテストは無い。リクエストIDの既存のテストは、proxyが作ったIDを受け取る場合として残る
-- **CI**: proxy・証明書を使う確認は、CIでのDockerイメージのビルドと起動の確認(Issue #22)と一緒に検討する。今はホストの`https`のstepで確かめる
+- **pytest**: proxyはpytestの対象外。リクエストIDのテスト(`tests/test_logging.py`)は、proxyが作ったIDを受け取る場合を確かめている
+- **CI**: CIではproxy・証明書を使う確認はしていない(Dockerイメージのビルドと起動もしていない)。ホストの`https`のstepで確かめる
 - **アプリ**: iOSシミュレータでのE2E(`run_checks.sh <run_id> e2e`)で、HTTPS越しのログイン・同期が通ることを確かめる
 
-## 後で行うこと
+## 対応していないこと
 
 - Androidエミュレータ・実機での接続(CAを信頼させる対応。上記「クライアントに信頼させる」)
-- 本番の構成(ドメイン・証明書・TLSを終端する場所・ロードバランサーの後ろでの送信元のIP)
-- 業務の意味がある送信元のIP単位の制限(多くのアカウントを少しずつ推測する攻撃への対策)。CGNATで無関係な利用者を巻き込むので、
-  本番の構成と送信元のIPの取り方が決まってから検討する
+- 本番の構成(ドメイン・証明書・TLSを終端する場所・ロードバランサーの後ろでの送信元のIP)。この構成は開発環境のためのもの
+- 業務の意味がある送信元のIP単位の制限(多くのアカウントを少しずつ推測する攻撃への対策)。モバイル回線では多くの端末が同じIPを共有する(CGNAT)ので、
+  IP単位で絞ると無関係な利用者まで止めてしまう

@@ -1,6 +1,6 @@
 """メールアドレスの確認コード(/api/users/me/email-verification)のテスト。
 
-仕様と設計はbackend/docs/メール.mdの「メールアドレスの確認コード」。メールはoutboxに積まれるだけで、SMTPには接続しない。
+仕様と設計はbackend/docs/mail.mdの「メールアドレスの確認コード」。メールはoutboxに積まれるだけで、SMTPには接続しない。
 """
 
 import uuid

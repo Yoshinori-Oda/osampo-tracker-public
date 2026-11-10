@@ -54,7 +54,7 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 
 # ---- RLS(行レベルセキュリティ)の今のユーザー ---------------------------------------------
-# 設計はbackend/docs/DBとマイグレーション.mdの「行レベルセキュリティ(RLS)」。
+# 設計はbackend/docs/database.mdの「行レベルセキュリティ(RLS)」。
 # set_config(..., true)(=SET LOCAL)はトランザクションが終わると消えるので、トランザクションが始まるたびに渡し直す
 # (管理者が他のユーザーを指定すると、監査ログのcommitを挟んでトランザクションが2つになるため)
 

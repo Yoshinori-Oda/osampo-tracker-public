@@ -1,12 +1,12 @@
 # 同期API
 
-同期API(`/api/users/{user_id}/sessions`)のサーバー側の実装と、削除済みのセッションのパージ(worker)。
+同期API(`/api/users/{user_id}/sessions`)のサーバー側の実装と、削除済みのセッションのパージ(worker)。2026-11-10時点のmainの実装を正とする。
 端末とサーバーにまたがる同期の仕組みは`docs/design/sync.md`。
 
 ## パージ(worker)
 
 - `worker`は`api`と同じイメージ・同じコードで起動コマンドだけを変え、APSchedulerで定期実行する(`app/worker.py`)
-- パージ期間90日・実行間隔1日(`PURGE_RETENTION_DAYS`・`PURGE_INTERVAL_HOURS`)。`deleted_at`(削除した日時)が
+- パージ期間90日・実行間隔24時間(`PURGE_RETENTION_DAYS`・`PURGE_INTERVAL_HOURS`。`backend/docs/overview.md`の「設定と秘密情報」)。`deleted_at`(削除した日時)が
   パージ期間より古いtombstoneを物理削除する(`app/services/purge_service.py`。track_pointsはON DELETE CASCADEで一緒に消える)
   - 起動直後に1回実行し、以降は実行間隔ごとに実行する。前回の実行が終わっていなければ重ねて実行しない
   - 失敗してもworkerは止めず、ログに残して次の実行で再び試みる
@@ -14,7 +14,6 @@
 - 同じパージのジョブで、期限切れのリフレッシュトークン・無効にした端末のログイン状態(「認証」)と、保持期間を過ぎたメールの送信の記録
   (「メール送信の基盤」)・監査ログ(「監査ログ」)も消す
 - `worker`は1つだけ起動する(複数起動するとジョブが重複して実行されるため)。メールの送信もworkerの別のジョブ(5秒ごと)で行う
-- 以前は`cron`コンテナがPostgREST経由でパージしていたが、frontendの切り替えに合わせて削除した(0003)
 
 ## 同期APIの実装
 
@@ -30,20 +29,19 @@
 - 位置情報の型: `track_points.location`は`geography(POINTZ, 4326)`(地球上の経度・緯度・高度。距離・範囲の計算は
   メートルで行われる)。geometry型は計算には使わず、次の2か所で一時的に経由するだけ(どちらも座標の値は変わらない):
   - 登録時: `ST_MakePoint`(geometry型を返す)で点を作り、`ST_SetSRID(..., 4326)`の後にgeographyへ変換する
-    (新しいAPIでは列への代入時の暗黙の変換に任せている)
+    (geographyへの変換は、列への代入時の暗黙の変換に任せている)
   - 取得時: `ST_X`/`ST_Y`/`ST_Z`はgeometry型の関数なので、geographyからgeometryに変換してから座標を取り出す。
     SQLAlchemyで型を指定せずに`cast(..., Geometry)`すると`geometry(GEOMETRY,-1)`(2次元)への変換になり、高度を持つ点が
     エラーになるので、`Geometry(geometry_type="POINTZ", srid=4326)`を指定する
-- トラックポイントの高度(altitude)はnullを許さず、nullなら422にする(2026-10-06決定)。`location`は高度込みの点(POINTZ)で
+- トラックポイントの高度(altitude)はnullを許さず、nullなら422にする。`location`は高度込みの点(POINTZ)で
   NOT NULLのため。frontendでも高度がnullになることは無い(Geolocatorの高度はnull不可で、信頼度の低い高度は前回の点との差が
-  0.5m未満・75m超のときに前回の高度で補っている)。高度を別の列に分ける案・NaNで保存する案は、実際には起きないケースのための
-  仕組みになるので採らなかった
+  0.5m未満・75m超のときに前回の高度で補っている)
 - テスト: `tests/conftest.py`の`db_session`がテストごとにトランザクションを開始し、最後にロールバックする。`api_client`は
   FastAPIの`dependency_overrides`でAPIのDBセッションを`db_session`に差し替える。APIの中の`commit()`はセーブポイントの確定になる
 
 ## エンドポイント
 
-パスは`/users/{user_id}/sessions`の下。共通の判定(413・415・406・401・403・404 `user_not_found`・422)は`backend/docs/バックエンド概要.md`の
+パスは`/users/{user_id}/sessions`の下。共通の判定(413・415・406・401・403・404 `user_not_found`・422)は`backend/docs/overview.md`の
 「判定の順番」のとおりで、以下では業務ルールの部分だけを書く。端末とサーバーにまたがる流れは`docs/design/sync.md`。
 
 不変の項目と可変の項目を次のように呼ぶ(`app/services/session_service.py`):
@@ -63,26 +61,23 @@
 
 - リクエストした端末自身がpushしたsessionも返す
 - sessionsはstarted_atの昇順、track_pointsはrecorded_atの昇順
-- ページングは行わない(個人のデータの件数では不要で、カーソルの扱いが複雑になるため)。必要になったら、このGETではidと
-  updated_at(tombstoneはdeleted_at)の一覧だけを返し、本体は1件ずつ(または数件ずつ)取得する形にする
-  (途中で失敗しても、取得済みの分を残して残りだけをやり直せる)
+- ページングは行わない(個人のデータの件数では不要で、カーソルの扱いが複雑になるため)
 
 ### POST /users/{user_id}/sessions
 
 1. updated_atに現在のサーバー時刻を入れる
-2. sessionsテーブル(全ユーザー)に同じidのレコードがあるとき:
+2. 同じidのレコードを行ロック付きで探す(RLSで他ユーザーのレコードは見えない。管理者は見える)。見つかったとき:
    - 他ユーザーのレコード、または特定項目\*1が1つでも違う: 409(`id_conflicted`)
    - 当該ユーザーのレコードで、特定項目\*1が全て同じ(同じsessionの再送):
      - tombstoneで、特定項目\*2が違う: 409(`deleted`)。同じなら既存のupdated_atを返して200
      - 生きていて、特定項目\*2が違う: 特定項目\*2とupdated_atだけを更新して200。同じなら既存のupdated_atを返して200
-3. 無ければ登録して201
+3. 見つからなければ`INSERT ... ON CONFLICT DO NOTHING`で登録して201。同時に同じidが登録された・他ユーザーのレコードと衝突した
+   (一意制約はRLSに関係なく効く)ために挿入が0件なら、もう一度だけ探し、見つかれば手順2の判定、見えなければ409(`id_conflicted`)
 
 - ended_atは必須(サーバーには終了したセッションだけを記録する)。track_pointsのaltitudeもnull不可(locationが高度込みの点(POINTZ)のため。
   高度の信頼度が低い場合は端末が前回の点の高度で補う)
-- max_altitude・min_altitudeの比較ではnullに注意する(SQLでは`NULL = NULL`が真にならない)
-- 同じidのsessionが同時に登録されたときのため、登録は`INSERT ... ON CONFLICT DO NOTHING`で行い、挿入が0件なら手順2からやり直す
 - セッションとトラックポイントは1つのトランザクションで登録する
-- uvicorn・FastAPIにはリクエストの大きさの上限が無いので、bodyに10MBの上限をかける(不正なリクエストで処理が滞らないように)
+- bodyの大きさの上限(10MB)は全てのリクエストに共通(uvicorn・FastAPIには上限が無いので、ミドルウェアでかける。`backend/docs/overview.md`)
 
 ### PATCH /users/{user_id}/sessions/{session_id}
 

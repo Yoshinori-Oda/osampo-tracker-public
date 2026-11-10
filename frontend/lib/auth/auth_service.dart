@@ -42,8 +42,8 @@ enum RefreshOutcome {
 }
 
 /// 認証(ログイン・新規登録・トークンの更新・ログアウト・アカウントの削除)とローカルアカウント(作成・切り替え・削除・通常との相互の変更)。
-/// サーバー側の仕様はbackend/docs/認証.mdの「エンドポイント」、端末側の設計は
-/// frontend/docs/フロントエンド概要.mdの「認証とアカウント」
+/// サーバー側の仕様はbackend/docs/auth.mdの「エンドポイント」、端末側の設計は
+/// frontend/docs/overview.mdの「認証とアカウント」
 class AuthService {
   final AppDatabase _db;
   final AuthStorage _storage;
@@ -251,7 +251,7 @@ class AuthService {
 
   /// メールアドレスの確認コードを(再)発行する(サーバーがメールを送る)。次に再発行できるまでの秒数を返す。
   /// 確認済みなら`email_already_verified`、間隔・回数の上限なら`too_many_requests`(retryAfterSecondsに待つ秒数)の
-  /// AuthExceptionを投げる。仕様はbackend/docs/メール.mdの「エンドポイント」
+  /// AuthExceptionを投げる。仕様はbackend/docs/mail.mdの「エンドポイント」
   Future<int> sendVerificationCode(http.Client authorizedClient) async {
     final http.Response response;
     try {
@@ -351,7 +351,7 @@ class AuthService {
 
   /// ログアウトする。サーバーでその端末のログイン状態を無効にし(失敗しても続ける)、端末のトークンを消す。
   /// ローカルのデータはそのユーザーのものとして残す。
-  /// アクセストークンが期限切れなら、AuthorizedClientが更新してから送り直す(backend/docs/認証.mdの「POST /auth/logout」)
+  /// アクセストークンが期限切れなら、AuthorizedClientが更新してから送り直す(backend/docs/auth.mdの「POST /auth/logout」)
   Future<void> logout(http.Client authorizedClient) async {
     if (_current != null) {
       try {

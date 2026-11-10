@@ -1,4 +1,4 @@
-"""同期APIのリクエスト/レスポンスの型と入力チェック。仕様はbackend/docs/同期API.mdを参照。
+"""同期APIのリクエスト/レスポンスの型と入力チェック。仕様はbackend/docs/sync-api.mdを参照。
 
 日時はタイムゾーン付き(AwareDatetime)のみ受け付ける("Z"や"+09:00"の無い日時は422)。
 各項目のdescription・examplesはOpenAPIのドキュメントになる。

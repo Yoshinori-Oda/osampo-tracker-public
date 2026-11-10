@@ -1,25 +1,24 @@
 # ログと監査ログ
 
-アクセスログ・アプリのログ・監査ログの設計。
+アクセスログ・アプリのログ・監査ログの設計。2026-11-10時点のmainの実装を正とする。
 
-## 監査ログ(2026-10-23に設計)
+## 監査ログ
 
 認証・アカウント・権限の出来事を「誰が・何を・いつ・どこから」の形でDBに残す。不正な利用(乗っ取り・総当たり・他人のデータへの
-アクセス)に気づき、後から経緯を調べるため。ログインの試行回数の制限(ブランチ`feat/login-attempt-limit`)は、この記録から失敗を数える。
+アクセス)に気づき、後から経緯を調べるため。ログインの試行回数の制限(`backend/docs/auth.md`の「ログインの試行回数の制限」)は、この記録から失敗を数える。
 
 ### 方針
 
-- **監査ログとアクセスログを分ける**。監査ログには意味のある出来事だけを残し、全てのリクエストの記録はアクセスログ(`backend/docs/バックエンド概要.md`の「保留」の
-  ログの設計)の役割にする。正常な流れでも頻繁に起きる失敗まで入れると、見るべき出来事が埋もれるため
+- **監査ログとアクセスログを分ける**。監査ログには意味のある出来事だけを残し、全てのリクエストの記録はアクセスログ(下記「ログ」)の役割にする。正常な流れでも頻繁に起きる失敗まで入れると、見るべき出来事が埋もれるため
 - 業務の処理と同じトランザクションで記録する。エラーで終わる処理(ログインの失敗等)は、記録をcommitしてからエラーを投げる
   (投げた後はロールバックされるため)。GETは業務の処理がcommitしないので、権限の確認(`verify_user_access`)で記録したらその場でcommitする
 - 送信元のIPは、ASGIのミドルウェア(`app/request_context.py`)がcontextvarに入れたものをサービスの処理から参照する(引数で渡して回らないため)。
   コンテナに届いた接続の送信元(`scope["client"]`)を使う。リバースプロキシから届いた接続は、uvicornが`X-Forwarded-For`で本当の送信元に
-  置き換えている(`backend/docs/HTTPSとリバースプロキシ.md`の「送信元の情報」)
+  置き換えている(`backend/docs/https-proxy.md`の「送信元の情報」)
 - アカウントを削除したら、そのユーザーの記録も消す(関連データを全て消す方針に合わせる)。削除の記録だけは日時と`user_id`を残す。
   ユーザーは自分の`user_id`を知らないので問い合わせには使えないが、運営側が削除を実行したことを示したり、他のログ(`user_id`が残る)と
   突き合わせたりするのに使う。メールアドレス・IP・端末IDは残さない
-- 保持期間は90日(`AUDIT_EVENT_RETENTION_DAYS`)。削除の記録も含めて、workerのパージで消す
+- 保持期間は90日(`AUDIT_EVENT_RETENTION_DAYS`。composeが渡していないので、既定値で動いている)。削除の記録も含めて、workerのパージで消す
 
 ### 記録する出来事
 
@@ -69,7 +68,7 @@
   `app/dependencies.py`の`verify_user_access`(権限)
 - テスト: `tests/test_audit_log.py`(出来事ごとに残ること、残さないもの、削除の記録)、`tests/test_purge.py`(パージ)
 
-## ログ(2026-10-23に設計)
+## ログ
 
 ### 3つのログの役割
 
@@ -95,13 +94,13 @@
   整形(`app/logging_config.py`のFormatter)だけを切り替える
 
 ```
-2026-10-23T05:05:12.345Z INFO app.access request request_id=8f3c… user_id=1111… ip=172.18.0.1 method=DELETE path=/api/users/{user_id}/sessions/{session_id} status=404 code=session_not_found duration_ms=12.3
+2026-10-23T05:05:12.345Z INFO app.access request request_id=8f3c… user_id=1111… ip=192.0.2.10 method=DELETE path=/api/users/{user_id}/sessions/{session_id} status=404 code=session_not_found duration_ms=12.3
 2026-10-23T05:05:12.340Z INFO app.services.session_service session not found request_id=8f3c… user_id=1111… session_id=ab12… reason=not_found_or_not_visible
 2026-10-23T05:10:00.001Z INFO app.worker purged tombstones=3 refresh_tokens=12 auth_sessions=0 outbox_emails=5 audit_events=40
 ```
 
 - 外部のライブラリ(structlog等)は使わず、Python標準のloggingにFormatterを2種類足して作った(仕組みを理解するため)。
-  ログを出す側は項目を`extra`で渡す。リクエストの中で出したログには、LogRecordを作るところ(`setLogRecordFactory`)で
+  ログを出す側は、項目を主に`extra`で渡す(メール送信のログは、行のidをメッセージの書式で出している)。リクエストの中で出したログには、LogRecordを作るところ(`setLogRecordFactory`)で
   リクエストIDとuser_idを付ける(どのハンドラーで出しても付くように。そのため、この2つはextraで渡さない)
 - レベルの目安: ERROR=人が対応すべき失敗(500の例外、メールを諦めた、パージの失敗)、WARNING=自動で回復するが続くと問題
   (SMTPに接続できず再送)、INFO=正常な重要な節目と判断の理由(起動、ジョブの結果、404・409の理由)、DEBUG=開発中の細部。既定はINFO
@@ -113,8 +112,8 @@
   レスポンスの`X-Request-ID`ヘッダーに付け、終わったらアクセスログを1行出す
 - リクエストIDはリバースプロキシが作って`X-Request-ID`で渡し(クライアントが送った値は上書きする)、ミドルウェアはそれを使う。
   形式(英数字と`-`の8〜64文字)に合わない・無い場合はサーバーで作る(proxyを通らないテスト等。任意の文字列をログに書き込ませないため)。
-  端末はIDを送らず、応答の`X-Request-ID`を端末のログに出す(2026-11-09に変更。`backend/docs/HTTPSとリバースプロキシ.md`の「リクエストID」)
-- 監査ログにも残す(`audit_events.request_id`)。アカウントの削除の記録には残さない(日時とuser_idだけ、の決定どおり)
+  端末はIDを送らず、応答の`X-Request-ID`を端末のログに出す(`backend/docs/https-proxy.md`の「リクエストID」)
+- 監査ログにも残す(`audit_events.request_id`)。アカウントの削除の記録には残さない(日時とuser_idだけを残す。上記「方針」)
 - 想定外の例外(500)は、このミドルウェアの中でスタックトレースをログに出してから投げ直す。500のレスポンスを作るStarletteの
   `ServerErrorMiddleware`はこれより外側で動き、そこではリクエストの情報を参照できないため(リクエストIDはscopeに置いて渡す)
 
@@ -136,9 +135,9 @@
 - 保持期間は90日(user_id・IPは個人関連情報として扱う。リバースプロキシのアクセスログも同じ)。開発環境では、Dockerのjson-fileのログに
   サービスごとに10MB×3ファイルまで(composeの`x-logging`)で、それより古いものは消える。日数での保持は、本番でログを集める先
   (CloudWatch Logs等)で設定する
-- リバースプロキシもアクセスログを出す(apiに届かなかったリクエストも含む。項目は`backend/docs/HTTPSとリバースプロキシ.md`の「アクセスログ」)
+- リバースプロキシもアクセスログを出す(apiに届かなかったリクエストも含む。項目は`backend/docs/https-proxy.md`の「アクセスログ」)
 
 ### テスト
 
-`tests/test_logging.py`: リクエストIDの生成・端末の値の採用・不正な値の置き換え、アクセスログの項目(パスの型・ステータス・user_id・
+`tests/test_logging.py`: リクエストIDの生成・受け取った値(proxyが付けたもの)の採用・不正な値の置き換え、アクセスログの項目(パスの型・ステータス・user_id・
 code・どのルートにも当たらないパス)、500のログとリクエストID、404の理由、監査ログのリクエストID、テキスト・JSONの整形
