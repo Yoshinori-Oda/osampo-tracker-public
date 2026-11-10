@@ -12,7 +12,7 @@ import 'package:test_tracking_01/models/status.dart';
 import 'package:test_tracking_01/repositories/tracking_repository.dart';
 
 // 同期処理(TrackingRepository)が同期API(backend/docs/同期API.md)を
-// frontend/docs/ユーザー機能追加に伴う変更予定.md の約束どおりに呼ぶことの確認。
+// docs/design/sync.md のとおりに呼ぶことの確認。
 // APIはMockClientで偽装し、ローカルDBはメモリ上のDriftを使う
 
 const _userId = '11111111-1111-1111-1111-111111111111';

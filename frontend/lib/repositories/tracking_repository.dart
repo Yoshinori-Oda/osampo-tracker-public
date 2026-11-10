@@ -54,7 +54,7 @@ class UserSyncStateStore implements SyncStateStore {
 }
 
 /// ローカルのDB(Drift)とAPIサーバー(backend/docs/同期API.md)の同期。
-/// 端末側の約束はfrontend/docs/ユーザー機能追加に伴う変更予定.mdを参照
+/// 同期の設計はdocs/design/sync.mdを参照
 class TrackingRepository {
   final AppDatabase _db;
   final http.Client _client;

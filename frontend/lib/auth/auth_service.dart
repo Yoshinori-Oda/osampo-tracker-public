@@ -42,8 +42,8 @@ enum RefreshOutcome {
 }
 
 /// 認証(ログイン・新規登録・トークンの更新・ログアウト・アカウントの削除)とローカルアカウント(作成・切り替え・削除・通常との相互の変更)。
-/// サーバー側の仕様はbackend/docs/認証.mdの「エンドポイント」、端末側の約束は
-/// frontend/docs/ユーザー機能追加に伴う変更予定.mdの「認証」「ローカルアカウント」
+/// サーバー側の仕様はbackend/docs/認証.mdの「エンドポイント」、端末側の設計は
+/// frontend/docs/フロントエンド概要.mdの「認証とアカウント」
 class AuthService {
   final AppDatabase _db;
   final AuthStorage _storage;

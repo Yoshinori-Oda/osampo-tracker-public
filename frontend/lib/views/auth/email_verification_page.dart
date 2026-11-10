@@ -7,7 +7,7 @@ import '../../providers/auth_providers.dart';
 import 'auth_error_messages.dart';
 
 // メールアドレスの確認コード(6桁)の入力画面。仕様はfrontend/docs/screens.mdの「auth/email_verification_page.dart」、
-// APIとのやり取りはfrontend/docs/ユーザー機能追加に伴う変更予定.mdの「メールアドレスの確認」
+// APIとのやり取りはfrontend/docs/フロントエンド概要.mdの「メールアドレスの確認」
 class EmailVerificationPage extends ConsumerStatefulWidget {
   // サインアップの直後に開いたか(「あとで」ボタンを出し、再発行のカウントダウンを始める)
   final bool afterSignup;

@@ -97,7 +97,7 @@ flutter run
   - docs/: backendの概要と機能ごとの詳細設計(4の「ドキュメント索引」)
 - docs: 基本設計・詳細設計・テスト・コマンド集(4の「ドキュメント索引」)
 - frontend: Flutterによるモバイルアプリ本体(`flutter create`の出力から開発)
-  - docs/: フロントエンド概要(実装上の注意)、ユーザー機能追加に伴うfrontendの変更内容(4の「ドキュメント索引」)
+  - docs/: フロントエンド概要(認証とアカウント・実装上の注意)、機能ごとの詳細設計、E2Eテスト(4の「ドキュメント索引」)
   - lib/
     - auth/: 認証(ログイン・トークンの更新・ログアウト・アカウントの削除)、トークンのsecure storageへの保存、
       アクセストークンを付けるHTTPクライアント(authorized_client.dart)
@@ -131,7 +131,8 @@ flutter run
 | --- | --- | --- |
 | `docs/commands.md` | 場面ごとのコマンド集(準備・起動・DBの作り直し・チェック・ログ・管理用のコマンド) | コマンドを探す |
 | `docs/basic-design/` | 基本設計書(システム概要・機能一覧・画面一覧と遷移・データ設計・API一覧・認証とセキュリティ)。全体像と一覧に徹し、詳細は下記の各文書へリンクする | 全体像を掴む、機能・画面・テーブル・APIを追加/削除する(該当の一覧も更新する) |
-| `docs/design/sync.md` | pull型差分同期、tombstone削除、削除と編集の競合 | `repositories/`・`backend/`を触る |
+| `docs/design/sync.md` | 端末とサーバーにまたがる同期の設計(pull型差分同期、tombstone削除、削除と編集の競合、existence-check) | `repositories/`・同期APIを触る |
+| `frontend/docs/フロントエンド概要.md` | frontendの概要。今は認証とアカウントの端末側の設計(同期を行う条件・トークン・ローカルアカウント・ローカルDBの移行)と、実装上の注意(同期・位置情報・地図・レイアウト・Drift・依存パッケージ)の症状・原因・見分け方 | `frontend/`を触る、認証・アカウントまわりを触る、似た不具合を調べる |
 | `frontend/docs/location-tracking.md` | RecordingPhase、timeLimit、位置情報バナー、収録開始のフォールバック、権限喪失時の強制停止 | `tracking_service.dart`・バナー・`main_page`/`recording_page`を触る |
 | `frontend/docs/background-recording.md` | バックグラウンドでの収録継続と非収録時の購読停止 | 位置情報の購読設定・ライフサイクル・権限・マニフェストを触る |
 | `frontend/docs/session-recovery.md` | 起動時の未完了セッション回収、保存/破棄画面 | 収録停止〜保存/破棄の流れを触る |
@@ -145,8 +146,6 @@ flutter run
 | `backend/docs/ログと監査ログ.md` | アクセスログ・アプリのログ・監査ログ | ログ・監査ログを触る |
 | `backend/docs/HTTPSとリバースプロキシ.md` | リバースプロキシ(nginx)・証明書(mkcert)・TLSの設定・送信元のIPとリクエストID・流量などの上限 | `backend/proxy/`・composeのポート・証明書・接続先のURLを触る、アプリがAPIにつながらない |
 | `backend/docs/メール送信の運用.md` | メールをサーバーから送って運用するための論点(送信手段・到達性・バウンス・outbox・悪用対策・テスト)の整理 | メール送信の設計・実装をする |
-| `frontend/docs/フロントエンド概要.md` | frontendの概要。今はfrontendの実装上の注意(同期・位置情報・地図・レイアウト・Drift・依存パッケージ)の症状・原因・見分け方 | `frontend/`を触る、似た不具合を調べる |
-| `frontend/docs/ユーザー機能追加に伴う変更予定.md` | APIに合わせてfrontendで必要になる変更 | `repositories/`・認証・アカウントまわりを触る |
 
 ## 5. 開発・運用ルール
 
