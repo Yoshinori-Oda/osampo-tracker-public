@@ -20,8 +20,9 @@
 
 - `app/routers/sessions.py`(HTTPの受け口)・`app/services/session_service.py`(業務ルール)・`app/schemas/session.py`
   (入力チェック)に分けている。仕様は下記「エンドポイント」
-- ユーザーの確認は依存関係`verify_user_access`(`app/dependencies.py`)で行う。認証を実装するまでは
-  トークンを検証せず、user_idのユーザーが存在するかだけを確認する
+- パスのuser_idを操作してよいかの確認は、依存関係`verify_user_access`(`app/dependencies.py`)で行う。アクセストークンの検証の後、
+  本人か管理者か(403 `forbidden`)、メールアドレスの確認(403 `email_not_verified`)、ユーザーの存在(404 `user_not_found`)の順に判定し、
+  他人のデータへのアクセスの拒否と、管理者による他のユーザーのデータへのアクセスは監査ログに残す
 - 時刻はDBの`clock_timestamp()`(実行した瞬間のサーバー時刻)を正とする。`now()`はトランザクションの開始時刻で固定されるため
   使わない。DBとの接続のタイムゾーンはUTCに固定し(`app/db.py`の`DB_CONNECT_ARGS`)、レスポンスの日時は常にUTC
 - 既知の制約: GETの`synced_at`より前の時刻を`updated_at`に持つ書き込みが、GETの後にコミットされると、次回の差分取得で
