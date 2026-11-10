@@ -1,6 +1,6 @@
 # API一覧
 
-基本設計書の5本目。apiが提供するREST APIの一覧と共通の方針をまとめる。2026-10-15時点のmainの実装を正とする。
+基本設計書の5本目。apiが提供するREST APIの一覧と共通の方針をまとめる。2026-11-10時点のmainの実装を正とする。
 各エンドポイントの処理の手順・判断の理由は`backend/docs/overview.md`の「API(共通)」と機能ごとの文書(`sync-api.md`・`auth.md`・`mail.md`)にあり、ここでは繰り返さない。
 入出力の型と例はOpenAPI(実装から自動生成。外には公開しないので、取り出し方は`backend/docs/overview.md`の「API(共通)」)で見る。
 
@@ -32,7 +32,7 @@
 | メソッド | パス | 名前 | 認証 | 成功 | 主なエラー | 使う機能 |
 |---|---|---|---|---|---|---|
 | POST | `/auth/signup` | 新規登録 | × | 201 + トークン | 409 `email_already_registered` | F-ACC-01 |
-| POST | `/auth/login` | ログイン | × | 200 + トークン | 401 `invalid_credentials`、403 `account_disabled` | F-ACC-02 |
+| POST | `/auth/login` | ログイン | × | 200 + トークン | 401 `invalid_credentials`、403 `account_disabled`、429 `too_many_requests`(試行回数の上限) | F-ACC-02 |
 | POST | `/auth/refresh` | トークンの更新 | ×(bodyでリフレッシュトークン) | 200 + トークン | 401 `invalid_refresh_token` | F-ACC-03 |
 | POST | `/auth/logout` | ログアウト | ○ | 204 | — | F-ACC-08 |
 
@@ -43,9 +43,9 @@
 
 | メソッド | パス | 名前 | 認証 | 成功 | 主なエラー | 使う機能 |
 |---|---|---|---|---|---|---|
-| GET | `/users/me` | 自分の情報(メイン画面の表示時に確認状態を取り込む) | ○ | 200 | — | F-ACC-03、05 |
+| GET | `/users/me` | 自分の情報 | ○ | 200 | — | F-ACC-03、05 |
 | PATCH | `/users/me` | 自分の情報の変更(表示名) | ○ | 200 | — | F-ACC-06 |
-| PUT | `/users/me/password` | パスワードの変更 | ○ | 204 | 400 `invalid_current_password` | F-ACC-07 |
+| PUT | `/users/me/password` | パスワードの変更 | ○ | 204 | 400 `invalid_current_password`、429 `too_many_requests`(試行回数の上限) | F-ACC-07 |
 | DELETE | `/users/me` | アカウントの削除 | ○ | 204 | — | F-ACC-09 |
 | POST | `/users/me/email-verification` | 確認コードの送信(再発行。新規登録時はサーバーが自動で送る) | ○ | 202 | 409 `email_already_verified`、429 `too_many_requests` | F-ACC-04 |
 | POST | `/users/me/email-verification/confirm` | 確認コードの確認 | ○ | 200 | 400 `invalid_verification_code`・`verification_code_expired` | F-ACC-04 |
@@ -55,7 +55,7 @@
 | メソッド | パス | 名前 | 認証 | 成功 | 主なエラー | 使う機能 |
 |---|---|---|---|---|---|---|
 | GET | `/users/{user_id}/sessions?last_synced_at=` | 差分取得 | ◎ | 200(変更・削除と`synced_at`、`request_existence_check`) | — | F-SYN-01 |
-| POST | `/users/{user_id}/sessions` | 登録(位置情報の点を含む) | ◎ | 201(同じ内容の再送は200) | 409 `id_conflicted` | F-SYN-01 |
+| POST | `/users/{user_id}/sessions` | 登録(位置情報の点を含む) | ◎ | 201(同じ内容の再送は200) | 409 `id_conflicted`・`deleted` | F-SYN-01 |
 | PATCH | `/users/{user_id}/sessions/{session_id}` | 修正(名前・移動手段・お気に入り) | ◎ | 200 | 404 `session_not_found`、409 `deleted` | F-SYN-01、02 |
 | DELETE | `/users/{user_id}/sessions/{session_id}` | 削除(tombstone) | ◎ | 204 | 404 `session_not_found` | F-SYN-01 |
 | POST | `/users/{user_id}/sessions/{session_id}/restore` | 削除の取り消し(編集内容の反映を含む) | ◎ | 200 | 404 `session_not_found`(パージ済み) | F-SYN-02 |
@@ -80,10 +80,13 @@
 | 403 | `forbidden` | 他のユーザーの`user_id`を指定した | — |
 | 403 | `email_not_verified` | メールアドレスが未確認(同期APIだけ) | 同期を止める |
 | 404 | `user_not_found` | パスの`user_id`のユーザーがいない(管理者が指定した場合だけ) | 同期を止める |
-| 413 / 415 / 406 | `payload_too_large` / `unsupported_media_type` / `not_acceptable` | リクエストの形式が違う | — |
+| 404 | `not_found` | 存在しないパス | — |
+| 405 | `method_not_allowed` | そのパスでは使えないメソッド(`Allow`ヘッダーで使えるメソッドを返す) | — |
+| 413 / 415 / 406 | `payload_too_large` / `unsupported_media_type` / `not_acceptable` | リクエストの形式が違う(406はGETの差分取得だけ) | — |
 | 422 | `validation_error` | 入力チェックの失敗(`details`に項目と理由) | — |
 | 429 | `too_many_requests` | 送信元のIPごとの流量の上限を超えた(リバースプロキシが返す) | `Retry-After`の秒数だけ待つ |
 | 500 | `internal_error` | 想定外のエラー(原因はサーバーのログにだけ出す) | — |
 | 502 / 504 | `service_unavailable` | apiにつながらない・応答が時間内に来ない(リバースプロキシが返す) | 同期を後で再試行する |
+| 400 | `http_error` | 壊れたリクエスト(リバースプロキシが返す) | — |
 
-`code`の全ての一覧はOpenAPI(`app/schemas/error.py`)。
+`code`の全ての一覧は`backend/app/errors.py`の`ErrorCode`(意味はOpenAPIに載る。`app/schemas/error.py`)。

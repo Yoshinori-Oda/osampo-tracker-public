@@ -15,7 +15,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
     -v test_db="$POSTGRES_TEST_DB" <<'EOSQL'
 -- マイグレーション用: テーブルを作成・変更し、その所有者になる
 CREATE ROLE :"migrator_user" LOGIN PASSWORD :'migrator_password';
--- api・worker用: データの読み書きのみ(テーブルの作成・変更はできない)
+-- api用: データの読み書きのみ(テーブルの作成・変更はできない)
 CREATE ROLE :"app_user" LOGIN PASSWORD :'app_password';
 -- worker用: ジョブで使うテーブル・操作だけ(権限はマイグレーションで個別に付ける。既定の権限は付けない)
 CREATE ROLE :"worker_user" LOGIN PASSWORD :'worker_password';
