@@ -1,62 +1,83 @@
-# 位置情報取得の堅牢性設計
+# 位置情報の取得と収録の状態
 
-関連: `frontend/lib/services/tracking_service.dart`・`models/`のRecordingPhase/LocationBannerState・`widgets/`の各バナー・`views/main_page.dart`・`views/recording_page.dart`
+GPSが未確定・不正確な状態(アプリの起動直後・屋内・電波が弱い等)でも収録が壊れないようにする仕組み。2026-11-10時点のmainの実装を正とする。
+中心は`frontend/lib/services/tracking_service.dart`の`TrackingService`。関連: `models/`の`RecordingPhase`・`LocationBannerState`、
+`widgets/`の各バナー、`views/main_page.dart`・`views/recording_page.dart`。
+バックグラウンドでの収録は`frontend/docs/background-recording.md`、停止後の保存/破棄は`frontend/docs/session-recovery.md`。
 
-GPSが未確定/不正確な状態(アプリ起動直後・屋内・電波不良など)でも収録が壊れないよう、
-`TrackingService`に位置情報監視の状態管理を持たせている。設計の要点:
+## 収録の状態(`RecordingPhase`)
 
-- **収録の状態は`RecordingPhase`(idle/starting/recording/stopping)で管理する**。
-  `startRecording()`はidleの時のみ受け付け、`starting`中は連打による二重start
-  (レースコンディション)を防ぐガードになる。`recording_page.dart`は`starting`中、
-  収録タブ全体を`AbsorbPointer`+オーバーレイでinactive化し、キャンセルボタンも出す。
-- **`Geolocator.getCurrentPosition`は必ず`LocationSettings(timeLimit: ...)`を設定して
-  呼ぶこと**(標準パラメータの`timeLimit`はdeprecated。`LocationSettings`経由で渡す)。
-  無期限に待つと、GPS未確定のままハングし続ける。呼び出し箇所ごとにtimeLimitを変えている:
-  `_initTrackingStream`の初回取得は1秒、startRecordingは5秒
-  (ストリームが既に動いていれば大抵は温まっているが、アプリ起動直後にすぐRECを
-  押すケースは温まっていないため長めに取っている)。
-- **`_lastGoodPositionAt`(DateTime?)が位置情報監視の中心的な状態**。精度に関わらず
-  位置を受信するたびに更新し、これを起点に「未取得(null)」「更新停止(10秒以上経過)」
-  を判定してバナー(`LocationBannerView`)に表示する。精度(accuracy>50m)は別軸の
-  ヒステリシス付きカウンタ(+3/-1、無更新中は凍結、長時間の停止から復帰した際は
-  クリーンに0リセット)で管理する。バナーの優先順位は権限エラー > 未取得/タイムアウト
-  > 精度低下(1つだけ表示)。
-- **`startRecording()`はOSの位置情報キャッシュ(`getLastKnownPosition()`)を使わない**。
-  新鮮な位置が取れなければ、このセッション内で最後に確認できた位置
-  (`_lastGoodPositionAt`が15秒以内)のみをフォールバック候補にし、確認ダイアログで
-  開始可否を聞く。15秒を超える/一度も取得できていない場合は
-  `StartRecordingBlockedException`を投げて開始をブロックする(再試行ボタン付きの
-  エラーダイアログを表示)。「セッションとして意味のあるデータかどうか」を基準に
-  しており、別セッション/別文脈の可能性があるOSキャッシュは意図的に除外している。
-- **収録開始時のtrackpointの`recordedAt`は押下時刻ではなく`Position.timestamp`
-  (実際にその位置情報が取得された時刻)を使う**。フォールバック開始時は数秒〜15秒
-  古い時刻になり得るが、意図した挙動。
-- **`stopRecording()`は終了地点の取得を待たずに戻る**。タイマーを止めて(待つ間に経過時間・
-  トラックポイントが増えないように)`stopping`にし、すぐに保存/破棄画面を開けるようにする。
-  終了地点は、停止後に最初に受信した位置(停止で購読を切り替えたときの初期位置の取得と、
-  ストリームのどちらか)を最大5秒(startRecordingと同じ)裏で待ち、受信できたらトラックポイントとして
-  追加する。別に`getCurrentPosition`を呼ぶと購読の切り替えの初期位置の取得と重なり、iOSでは
-  先の呼び出しが完了しないため(`frontend/docs/overview.md`の「位置情報 (geolocator)」)。取得中も保存/破棄はでき、`completeSession()`はDBへの反映(保存/削除)だけを
-  終了地点の追加の完了まで待つ(保存では終了地点も含めて同期し、破棄では削除の後に終了地点が
-  書き込まれないように)。取れなかった場合はそれまでの記録のまま保存し、画面には通知しない
-  (`appLog`の`[tracking]`の行にだけ出す)。終了地点は統計(距離・高度)には加えない
-  (停止前の数秒分の移動で、トラックポイントとして地図に足すだけ)
-- **収録中に位置情報の権限/サービスが失われた場合**、`_forceStopForPermissionTrouble()`が
-  `stopRecording(skipFinalPositionFetch: true)`を呼んで強制停止し、
-  `utils/save_or_discard_screen.dart`の`showSaveOrDiscardScreen()`(通常の停止フローと
-  共通化済み)を`navigatorKey`経由で呼び出して保存/破棄を確認する。**検知経路は
-  `getPositionStream`の`onError`だけでは不十分**(実際に発生した不具合)。設定アプリでの
-  権限/サービス変更は必ず一度アプリをバックグラウンドに回すため、多くの場合onErrorは
-  発火しない。実質的な主検知経路は`main_page.dart`のフォアグラウンド復帰フックから呼ぶ
-  `refreshLocationAvailability()`で、`RecordingPhase.recording`中にtroubleを検知した
-  場合も同じ強制停止をトリガーする(`stopping`中の多重発火は`_phase`チェックで防止)。
-- **収録状態バナーと位置情報バナーは全タブ共通で`main_page.dart`の`body`上部に表示する**。
-  どちらも非アクティブ時は`SizedBox.shrink()`で高さ0にする設計だが、それを包む
-  padding/`SafeArea`は「バナーが1つもない時は一切描画しない」ようにしないと、
-  ステータスバー避けの空白だけが常時残ってしまう。逆にバナー表示中は、タブ側
-  (各`AppBar`)が自前でも同じ分のステータスバー避けpaddingを確保してしまい二重の
-  空白になるため、`MediaQuery.removePadding(removeTop: hasAnyBanner)`でタブ側の
-  重複分を明示的に消費している(詳細は`main_page.dart`参照)。
-- GPSを掴みやすくするTipsは`views/gps_help_page.dart`にまとめ、「未取得/更新停止」の
-  位置情報バナーと`startRecording`のブロックダイアログの両方から
-  `widgets/gps_help_link.dart`経由でリンクしている。
+- `idle` → `starting` → `recording` → `stopping` → `idle`
+- `startRecording()`は`idle`のときだけ受け付ける。`starting`の間は、連打による二重の開始を防ぐ。`recording_page.dart`は`starting`の間、
+  収録タブ全体を`AbsorbPointer`とオーバーレイで操作できなくし、キャンセルボタンを出す
+- `stopping`は、停止してから保存/破棄が済むまでの状態。この間も収録中のセッション(`_session`)は残る
+
+## 位置の取得
+
+- `Geolocator.getCurrentPosition`は必ず`LocationSettings(timeLimit: ...)`付きで呼ぶ(無期限に待つと、GPSが未確定のままハングする)。
+  呼び出しを重ねない(`frontend/docs/overview.md`の「位置情報 (geolocator)」)
+- フォアグラウンド用の設定で位置情報ストリームを購読し始めるたびに(`_startPositionStream`)、初期位置を`timeLimit`1秒で取る
+  (取れなくても、以後はストリームからの更新を待つだけ)
+- 収録の開始時は`timeLimit`5秒で新しい位置を取る(アプリの起動直後にすぐ開始する場合はGPSが温まっていないため、長めにしている)
+
+## 位置情報の監視とバナー
+
+- 位置を受信するたびに、精度に関わらず`_lastGoodPositionAt`(最後に受信した時刻)と`_lastReceivedPosition`を更新する
+- バナー(`LocationBannerView`)の状態は次の順に判定し、1つだけ出す:
+  1. 権限・位置情報サービスの問題
+  2. 未取得(一度も受信していない)
+  3. 更新停止: 最後の受信から10秒以上。ただし監視を再開した時刻(サスペンドからの復帰)の方が新しければそちらを起点にする
+     (止めていた間の空白を「停止」と見なさないため。表示する経過時間は実際の最後の受信から)
+  4. 精度の低下: 精度が50mより悪い受信で+3、良い受信で-1するカウンタ(0〜9)が1以上
+- 精度のカウンタは、更新停止から復帰したときは0に戻す(停止前の状態を引きずらない)
+- バナーは1秒ごとに計算し直す(受信が止まっても「更新停止」に変わるように)
+
+## 収録の開始
+
+- OSの位置情報のキャッシュ(`getLastKnownPosition()`)は使わない(別の文脈の古い位置の可能性があるため)
+- 5秒以内に新しい位置が取れなければ、アプリの起動後に最後に受信した位置を、受信から15秒以内のときだけ候補にし、
+  ダイアログ「現在地を取得できませんでした」で、その位置から始めるかを聞く
+- 15秒を超えている・一度も受信していない場合は`StartRecordingBlockedException`を投げて開始しない(再試行ボタン付きのエラーダイアログを出す)
+- 開始地点のトラックポイントの`recordedAt`は、ボタンを押した時刻ではなく`Position.timestamp`(その位置を取得した時刻)。
+  候補の位置から始めたときは数秒〜15秒前の時刻になるが、意図した挙動
+
+## 収録中の記録
+
+- 1秒ごとのタイマーで経過時間を進め、5秒ごとに、その時点で最後に受信した位置をトラックポイントとして記録する(`recordedAt`は記録した時刻)
+
+## 収録の停止と終了地点
+
+- `stopRecording()`はタイマーを止めて(待つ間に経過時間・トラックポイントが増えないように)`stopping`にし、終了地点の取得を待たずに戻る
+  (保存/破棄画面をすぐ開けるように)
+- 終了地点: 経過秒数が5の倍数でない(最後の記録から時間が空いている)ときだけ、停止後に最初に受信した位置(停止で購読を切り替えたときの
+  初期位置の取得と、ストリームのどちらか)を最大5秒、裏で待つ(`_addFinalPoint`)。受信できたら、停止した時刻を`recordedAt`として
+  トラックポイントに足す
+  - `getCurrentPosition`を別に呼ばないのは、購読の切り替えの初期位置の取得と重なり、iOSでは先の呼び出しが完了しないため
+  - 取れなかった場合はそれまでの記録のまま保存し、画面には出さない(`appLog`の`[tracking]`の行にだけ出す)
+  - 終了地点は統計(距離・高度)には加えず、地図のトラックポイントに足すだけ
+- 取得の間も保存/破棄はできる。`completeSession()`は、DBへの反映(保存・削除)だけを終了地点の追加が済むまで待つ(保存では終了地点も
+  含めて同期し、破棄では削除の後に終了地点が書き込まれないように)
+
+## 権限・位置情報サービスを失ったとき
+
+- 収録中に位置情報の権限・サービスが失われたら、`_forceStopForPermissionTrouble()`が終了地点を取らずに停止し
+  (`stopRecording(skipFinalPositionFetch: true)`)、`_presentPendingCompletion()`で保存/破棄を促す。収録タブを見ていれば
+  保存/破棄画面を直接開き、ほかのタブならスナックバー「保存/破棄が必要なセッションがあります」(「収録画面へ」で開く)を出す
+- 検知の経路は2つある:
+  - ストリームの`onError`(`_handleLocationStreamError`)。`isRecording`(収録中のセッションがある)なら強制停止する
+  - フォアグラウンド復帰時に`main_page.dart`から呼ぶ`refreshLocationAvailability()`。`RecordingPhase.recording`のときだけ強制停止する
+- `onError`だけでは足りない。設定アプリで権限・サービスを変えるには一度アプリをバックグラウンドに回すので、多くの場合`onError`は
+  発火しない。実際の主な検知の経路はフォアグラウンド復帰時の確認
+
+## バナーの表示
+
+- 全タブ共通のバナーは、`main_page.dart`の`body`の上部に、収録状態(`RecordingPhaseBannerView`)・位置情報(`LocationBannerView`)・
+  認証(`AuthBannerView`)の順に並べる。どれも出ていないときは高さ0
+- ステータスバーの分の上端の余白は、バナーが1つでも出ているときだけ、バナーの上に`Padding`で1回だけ取る。その下のタブ(各`AppBar`)は
+  自分でも同じ分の余白を取ってしまうので、`MediaQuery.removePadding(removeTop: hasAnyBanner)`で消費済みにする
+  (`frontend/docs/overview.md`の「レイアウト」)
+
+## GPSのヘルプ
+
+- GPSを掴みやすくするコツは`views/gps_help_page.dart`にまとめ、「未取得・更新停止」の位置情報バナーと、開始できなかったときのエラーダイアログの
+  両方から`widgets/gps_help_link.dart`の`GpsHelpLinkButton`(「取得のコツ」)で開く
