@@ -399,14 +399,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
 
     if (shouldStop != true) return;
 
-    final finalPointFetched = await service.stopRecording();
-
-    if (!context.mounted) return;
-    if (finalPointFetched == false) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('終了地点の位置情報が取得できなかったため、直前の記録までを保存しました'))
-      );
-    }
+    // 終了地点の取得は待たずに戻る(取れたら保存/破棄画面の地図に反映される)
+    await service.stopRecording();
 
     // save / discard screen (強制停止/起動時リカバリと同じ経路で表示する)
     await service.resumePendingCompletion();

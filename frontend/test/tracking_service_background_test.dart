@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:test_tracking_01/models/move_method.dart';
 import 'package:test_tracking_01/models/recording_phase.dart';
 import 'package:test_tracking_01/models/recording_session.dart';
 import 'package:test_tracking_01/repositories/tracking_repository.dart';
@@ -38,8 +39,18 @@ class _FakeGeolocatorPlatform extends GeolocatorPlatform {
   @override
   Future<LocationPermission> requestPermission() async => LocationPermission.whileInUse;
 
+  // 設定すると、次の1回のgetCurrentPositionはこのCompleterの完了まで返らない(収録停止時の終了地点の取得用)
+  Completer<Position>? nextCurrentPosition;
+
   @override
-  Future<Position> getCurrentPosition({LocationSettings? locationSettings}) async => _position();
+  Future<Position> getCurrentPosition({LocationSettings? locationSettings}) {
+    final pending = nextCurrentPosition;
+    if (pending != null) {
+      nextCurrentPosition = null;
+      return pending.future;
+    }
+    return Future.value(_position());
+  }
 
   @override
   Stream<Position> getPositionStream({LocationSettings? locationSettings}) {
@@ -50,8 +61,11 @@ class _FakeGeolocatorPlatform extends GeolocatorPlatform {
   }
 }
 
-// 収録開始時に使うDB書き込みだけを実装する(それ以外が呼ばれたらテスト失敗にする)
+// 収録の開始・停止・保存/破棄で使うDB書き込みだけを実装する(それ以外が呼ばれたらテスト失敗にする)
 class _FakeTrackingRepository implements TrackingRepository {
+  // 呼ばれた書き込みの順序
+  final List<String> calls = [];
+
   @override
   Future<int> initSession({required RecordingSession session}) async => 1;
 
@@ -62,7 +76,25 @@ class _FakeTrackingRepository implements TrackingRepository {
     required double longitude,
     required double altitude,
     required DateTime recordedAt,
-  }) async => 1;
+  }) async {
+    calls.add('addTrackPoint');
+    return 1;
+  }
+
+  @override
+  Future<void> saveCompletedSession({
+    required RecordingSession session,
+    required String name,
+    required MoveMethod moveMethod,
+    required DateTime savedAt,
+  }) async {
+    calls.add('save');
+  }
+
+  @override
+  Future<void> deleteRecordingSession({required RecordingSession session}) async {
+    calls.add('delete');
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -88,9 +120,9 @@ void main() {
     GeolocatorPlatform.instance = originalPlatform;
   });
 
-  TrackingService createService() {
+  TrackingService createService([_FakeTrackingRepository? repo]) {
     final service = TrackingService(
-      _FakeTrackingRepository(),
+      repo ?? _FakeTrackingRepository(),
       getCurrentTabIndex: () => 0,
       switchToRecordingTab: () {},
     );
@@ -217,6 +249,91 @@ void main() {
       expect(background.pauseLocationUpdatesAutomatically, isFalse);
       expect((foreground as AppleSettings).allowBackgroundLocationUpdates, isFalse);
       expect(foreground.pauseLocationUpdatesAutomatically, isFalse);
+    });
+  });
+
+  group('収録停止時の終了地点', () {
+    late _FakeTrackingRepository repo;
+    late TrackingService service;
+    late Completer<Position> finalPosition;
+
+    // 収録を開始し、終了地点の取得の対象になるよう経過秒数を5の倍数からずらしてから、
+    // 終了地点の取得を手元で完了させるように準備する
+    Future<void> startAndRecordBriefly() async {
+      repo = _FakeTrackingRepository();
+      service = createService(repo);
+      await settle(service);
+      await service.startRecording();
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      repo.calls.clear();
+      finalPosition = Completer<Position>();
+      geolocator.nextCurrentPosition = finalPosition;
+    }
+
+    Future<void> flush() async {
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    test('終了地点の取得を待たずに停止し、取得できたら追加する', () async {
+      await startAndRecordBriefly();
+
+      await service.stopRecording();
+      expect(service.phase, RecordingPhase.stopping);
+      expect(repo.calls, isEmpty);
+
+      finalPosition.complete(_position());
+      await flush();
+      expect(repo.calls, ['addTrackPoint']);
+    });
+
+    test('終了地点の取得中は、経過時間もトラックポイントも増えない', () async {
+      await startAndRecordBriefly();
+
+      await service.stopRecording();
+      final elapsedSeconds = service.recordingSession!.elapsedSeconds;
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+
+      expect(service.recordingSession!.elapsedSeconds, elapsedSeconds);
+      expect(repo.calls, isEmpty);
+    });
+
+    test('保存は、画面の状態はすぐに戻し、DBへは終了地点の追加を待ってから反映する', () async {
+      await startAndRecordBriefly();
+      await service.stopRecording();
+
+      final completion = service.completeSession(doSave: true, sessionName: 'test', moveMethod: MoveMethod.walk);
+      await flush();
+      expect(service.phase, RecordingPhase.idle);
+      expect(repo.calls, isEmpty);
+
+      finalPosition.complete(_position());
+      await completion;
+      expect(repo.calls, ['addTrackPoint', 'save']);
+    });
+
+    test('破棄は、終了地点の追加を待ってから削除する', () async {
+      await startAndRecordBriefly();
+      await service.stopRecording();
+
+      final completion = service.completeSession(doSave: false);
+      await flush();
+      expect(repo.calls, isEmpty);
+
+      finalPosition.complete(_position());
+      await completion;
+      expect(repo.calls, ['addTrackPoint', 'delete']);
+    });
+
+    test('終了地点が取れなかった場合は、追加せずに保存する', () async {
+      await startAndRecordBriefly();
+      await service.stopRecording();
+
+      final completion = service.completeSession(doSave: true, sessionName: 'test', moveMethod: MoveMethod.walk);
+      finalPosition.completeError(TimeoutException('final position'));
+      await completion;
+      expect(repo.calls, ['save']);
     });
   });
 }

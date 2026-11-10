@@ -448,10 +448,18 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<List<TrackPoint>> getTrackPointsForSession(String sessionId) {
-    return (select(trackPoints)
-        ..where((tbl) => tbl.sessionId.equals(sessionId))
-        ..orderBy([(tbl) => OrderingTerm.asc(tbl.recordedAt)]))
-      .get();
+    return _trackPointsForSessionQuery(sessionId).get();
+  }
+
+  // 画面表示用。収録停止後に終了地点が追加されたときなどに、表示中の地図へ反映する
+  Stream<List<TrackPoint>> watchTrackPointsForSession(String sessionId) {
+    return _trackPointsForSessionQuery(sessionId).watch();
+  }
+
+  SimpleSelectStatement<$TrackPointsTable, TrackPoint> _trackPointsForSessionQuery(String sessionId) {
+    return select(trackPoints)
+      ..where((tbl) => tbl.sessionId.equals(sessionId))
+      ..orderBy([(tbl) => OrderingTerm.asc(tbl.recordedAt)]);
   }
 
   Stream<Session> getSessionById(String sessionId) {

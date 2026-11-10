@@ -39,8 +39,8 @@ const _defaultNameB = '9/28 11:00:00の徒歩アクティビティ';
 Widget _buildApp() {
   return ProviderScope(
     overrides: [
-      trackPointsBySessionIdProvider(_sessionA.sessionId).overrideWith((ref) async => <TrackPoint>[]),
-      trackPointsBySessionIdProvider(_sessionB.sessionId).overrideWith((ref) async => <TrackPoint>[]),
+      trackPointsBySessionIdProvider(_sessionA.sessionId).overrideWith((ref) => Stream.value(<TrackPoint>[])),
+      trackPointsBySessionIdProvider(_sessionB.sessionId).overrideWith((ref) => Stream.value(<TrackPoint>[])),
     ],
     child: MaterialApp(
       navigatorKey: navigatorKey,
