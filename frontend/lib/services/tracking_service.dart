@@ -40,7 +40,7 @@ class TrackingService {
   static const Duration _startFreshPositionTimeout = Duration(seconds: 5);
   // startRecording: この時間を超えて古い位置情報はフォールバックとして使わずブロックする
   static const Duration _startFallbackAgeLimit = Duration(seconds: 15);
-  // stopRecording: 終了地点の取得のtimeout(収録開始と同じ。保存/破棄画面を開いた後に裏で待つ)
+  // stopRecording: 終了地点(停止後に最初に受信する位置)を待つ時間(収録開始と同じ。保存/破棄画面を開いた後に裏で待つ)
   static const Duration _finalPositionTimeout = _startFreshPositionTimeout;
 
   StreamSubscription<Position>? _positionStreamSubscription;
@@ -761,8 +761,8 @@ class TrackingService {
   }
 
   // stop recording
-  // 終了地点の取得は待たずに戻る(保存/破棄画面をすぐに開けるように)。取得は裏で行い、
-  // 取れたらトラックポイントとして追加する(取れなければそれまでの記録のまま)
+  // 終了地点の取得は待たずに戻る(保存/破棄画面をすぐに開けるように)。停止後に最初に受信した位置を
+  // 裏で待ち、受信できたらトラックポイントとして追加する(受信できなければそれまでの記録のまま)
   Future<void> stopRecording({bool skipFinalPositionFetch = false}) async {
     if (!isRecording) return;
     _setPhase(RecordingPhase.stopping);
@@ -784,14 +784,14 @@ class TrackingService {
     }
   }
 
+  // 終了地点は、別にGeolocator.getCurrentPositionを呼ばず、ストリーム(停止で購読を切り替えたときの
+  // 初期位置の取得を含む)から受信する位置を使う。停止の直後は購読の切り替えで初期位置の
+  // getCurrentPositionが呼ばれ、iOS(geolocator_apple 2.4.3未満)では呼び出しが重なると先の呼び出しが
+  // 完了しなくなるため(docs/pitfalls.md)
   Future<void> _addFinalPoint({required String sessionId, required DateTime recordedAt}) async {
     try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: _finalPositionTimeout
-        )
-      );
+      // .firstはこの時点で購読するので、この後に受信した位置だけが対象になる
+      final position = await _currentPositionController.stream.first.timeout(_finalPositionTimeout);
       if (_disposed) return;
       await _repo.addTrackPoint(
         sessionId: sessionId,

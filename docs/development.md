@@ -177,7 +177,8 @@
   (`code`の無い404・`user_not_found`では同期を止め、ローカルのデータに触れない)
 - `TrackingRepository.updateSession()`はpush用の内部メソッド。ローカル編集用は`updateSessionInfo()`
   のように別名にする(同名だと`duplicate_definition`)
-- `Geolocator.getCurrentPosition`は必ず`LocationSettings(timeLimit: ...)`付きで呼ぶ(無期限だとハングする)
+- `Geolocator.getCurrentPosition`は必ず`LocationSettings(timeLimit: ...)`付きで呼ぶ(無期限だとハングする)。
+  呼び出しを重ねない(iOSでは先の呼び出しが完了せず、時間切れになる)
 - flutter_mapで初期表示時にboundsへフィットさせるときは、後から`fitCamera()`/`move()`を呼ばず
   `MapOptions.initialCameraFit`を使い、`CameraFit.bounds`には`maxZoom`を付ける(タイルがグレーのままになる)
 - 地図の`TileLayer`は`utils/map_tiles.dart`の定数を使う。`userAgentPackageName`を`com.example.*`のような汎用の値にしたり

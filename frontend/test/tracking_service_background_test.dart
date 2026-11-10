@@ -39,17 +39,28 @@ class _FakeGeolocatorPlatform extends GeolocatorPlatform {
   @override
   Future<LocationPermission> requestPermission() async => LocationPermission.whileInUse;
 
-  // 設定すると、次の1回のgetCurrentPositionはこのCompleterの完了まで返らない(収録停止時の終了地点の取得用)
+  // getCurrentPositionが呼ばれた回数
+  int currentPositionRequests = 0;
+  // 設定すると、次の1回のgetCurrentPositionはこのCompleterの完了まで返らない(timeLimitを過ぎたらTimeoutException)
   Completer<Position>? nextCurrentPosition;
 
   @override
   Future<Position> getCurrentPosition({LocationSettings? locationSettings}) {
+    currentPositionRequests++;
     final pending = nextCurrentPosition;
     if (pending != null) {
       nextCurrentPosition = null;
-      return pending.future;
+      final timeLimit = locationSettings?.timeLimit;
+      return timeLimit == null ? pending.future : pending.future.timeout(timeLimit);
     }
     return Future.value(_position());
+  }
+
+  // 購読中のストリームに位置を流す
+  void emit(Position position) {
+    for (final controller in _controllers.where((c) => c.hasListener)) {
+      controller.add(position);
+    }
   }
 
   @override
@@ -255,10 +266,11 @@ void main() {
   group('収録停止時の終了地点', () {
     late _FakeTrackingRepository repo;
     late TrackingService service;
-    late Completer<Position> finalPosition;
+    // 停止で購読を切り替えたときの初期位置の取得(getCurrentPosition)。手元で完了させる
+    late Completer<Position> initialPosition;
 
     // 収録を開始し、終了地点の取得の対象になるよう経過秒数を5の倍数からずらしてから、
-    // 終了地点の取得を手元で完了させるように準備する
+    // 停止後の初期位置の取得を手元で完了させるように準備する
     Future<void> startAndRecordBriefly() async {
       repo = _FakeTrackingRepository();
       service = createService(repo);
@@ -266,8 +278,8 @@ void main() {
       await service.startRecording();
       await Future<void>.delayed(const Duration(milliseconds: 1100));
       repo.calls.clear();
-      finalPosition = Completer<Position>();
-      geolocator.nextCurrentPosition = finalPosition;
+      initialPosition = Completer<Position>();
+      geolocator.nextCurrentPosition = initialPosition;
     }
 
     Future<void> flush() async {
@@ -276,14 +288,31 @@ void main() {
       }
     }
 
-    test('終了地点の取得を待たずに停止し、取得できたら追加する', () async {
+    test('終了地点のためにgetCurrentPositionを別に呼ばず、停止後に受信した位置を追加する', () async {
       await startAndRecordBriefly();
+      final requestsBeforeStop = geolocator.currentPositionRequests;
 
       await service.stopRecording();
+      await flush();
       expect(service.phase, RecordingPhase.stopping);
       expect(repo.calls, isEmpty);
 
-      finalPosition.complete(_position());
+      initialPosition.complete(_position());
+      await flush();
+      expect(repo.calls, ['addTrackPoint']);
+      // 呼んだのは購読の切り替えの初期位置の1回だけ(重なると先の呼び出しが完了しなくなるため)
+      expect(geolocator.currentPositionRequests, requestsBeforeStop + 1);
+    });
+
+    test('初期位置が取れなくても、ストリームから受信した位置を追加する', () async {
+      await startAndRecordBriefly();
+
+      await service.stopRecording();
+      initialPosition.completeError(TimeoutException('initial position'));
+      await settle(service);
+      expect(repo.calls, isEmpty);
+
+      geolocator.emit(_position());
       await flush();
       expect(repo.calls, ['addTrackPoint']);
     });
@@ -308,7 +337,7 @@ void main() {
       expect(service.phase, RecordingPhase.idle);
       expect(repo.calls, isEmpty);
 
-      finalPosition.complete(_position());
+      initialPosition.complete(_position());
       await completion;
       expect(repo.calls, ['addTrackPoint', 'save']);
     });
@@ -321,19 +350,20 @@ void main() {
       await flush();
       expect(repo.calls, isEmpty);
 
-      finalPosition.complete(_position());
+      initialPosition.complete(_position());
       await completion;
       expect(repo.calls, ['addTrackPoint', 'delete']);
     });
 
-    test('終了地点が取れなかった場合は、追加せずに保存する', () async {
+    test('時間内に位置を受信できなかった場合は、追加せずに保存する', () async {
       await startAndRecordBriefly();
       await service.stopRecording();
 
       final completion = service.completeSession(doSave: true, sessionName: 'test', moveMethod: MoveMethod.walk);
-      finalPosition.completeError(TimeoutException('final position'));
+      initialPosition.completeError(TimeoutException('initial position'));
+      // 終了地点を待つ時間(5秒)を過ぎるまで待つ
       await completion;
       expect(repo.calls, ['save']);
-    });
+    }, timeout: const Timeout(Duration(seconds: 30)));
   });
 }

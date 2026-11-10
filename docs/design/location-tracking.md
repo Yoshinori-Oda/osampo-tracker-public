@@ -12,7 +12,7 @@ GPSが未確定/不正確な状態(アプリ起動直後・屋内・電波不良
 - **`Geolocator.getCurrentPosition`は必ず`LocationSettings(timeLimit: ...)`を設定して
   呼ぶこと**(標準パラメータの`timeLimit`はdeprecated。`LocationSettings`経由で渡す)。
   無期限に待つと、GPS未確定のままハングし続ける。呼び出し箇所ごとにtimeLimitを変えている:
-  `_initTrackingStream`の初回取得は1秒、startRecordingとstopRecordingの終了地点は5秒
+  `_initTrackingStream`の初回取得は1秒、startRecordingは5秒
   (ストリームが既に動いていれば大抵は温まっているが、アプリ起動直後にすぐRECを
   押すケースは温まっていないため長めに取っている)。
 - **`_lastGoodPositionAt`(DateTime?)が位置情報監視の中心的な状態**。精度に関わらず
@@ -33,8 +33,10 @@ GPSが未確定/不正確な状態(アプリ起動直後・屋内・電波不良
   古い時刻になり得るが、意図した挙動。
 - **`stopRecording()`は終了地点の取得を待たずに戻る**。タイマーを止めて(待つ間に経過時間・
   トラックポイントが増えないように)`stopping`にし、すぐに保存/破棄画面を開けるようにする。
-  終了地点はtimeLimit 5秒(startRecordingと同じ)で裏で取得し、取れたらトラックポイントとして
-  追加する。取得中も保存/破棄はでき、`completeSession()`はDBへの反映(保存/削除)だけを
+  終了地点は、停止後に最初に受信した位置(停止で購読を切り替えたときの初期位置の取得と、
+  ストリームのどちらか)を最大5秒(startRecordingと同じ)裏で待ち、受信できたらトラックポイントとして
+  追加する。別に`getCurrentPosition`を呼ぶと購読の切り替えの初期位置の取得と重なり、iOSでは
+  先の呼び出しが完了しないため(`docs/pitfalls.md`の「位置情報」)。取得中も保存/破棄はでき、`completeSession()`はDBへの反映(保存/削除)だけを
   終了地点の追加の完了まで待つ(保存では終了地点も含めて同期し、破棄では削除の後に終了地点が
   書き込まれないように)。取れなかった場合はそれまでの記録のまま保存し、画面には通知しない
   (`appLog`の`[tracking]`の行にだけ出す)。終了地点は統計(距離・高度)には加えない
