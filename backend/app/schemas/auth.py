@@ -68,7 +68,7 @@ class RefreshRequest(BaseModel):
 
 
 class UpdateMeRequest(BaseModel):
-    # メールアドレスの変更(11月以降)・パスワードの変更(ブロック3)は別のendpointで行うので、それ以外の項目は422にする
+    # メールアドレスの変更(未実装)・パスワードの変更は別のendpointで行うので、それ以外の項目は422にする
     model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [{"display_name": "たろう"}]})
 
     display_name: DisplayName = Field(description="表示名(1〜50文字)")

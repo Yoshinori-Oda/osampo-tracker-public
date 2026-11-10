@@ -1,6 +1,6 @@
 # E2E/画面確認テスト (integration_test + flutter drive)
 
-`integration_test/`のシナリオを書く・直す際に読む。実行方法とログの読み方は
+`integration_test/`のシナリオの書き方と注意点。実行方法とログの読み方は
 `docs/development.md`の「テスト」を参照(AIコーディングエージェントを使う場合の分担は、同じ文書の
 「AIコーディングエージェントを使った開発」)。
 

@@ -6,7 +6,7 @@
 ## server
 url: https://localhost/api (開発環境。リバースプロキシ経由。`backend/docs/HTTPSとリバースプロキシ.md`)
 (以下のendpointsのパスはこのurlからの相対パス。例: `GET /users/{user_id}/sessions` は `https://localhost/api/users/{user_id}/sessions`。
-実装: 同期は`backend/app/routers/sessions.py`、認証・ユーザーは`backend/app/routers/auth.py`・`backend/app/routers/users.py`(ブロック2で実装))
+実装: 同期は`backend/app/routers/sessions.py`、認証・ユーザーは`backend/app/routers/auth.py`・`backend/app/routers/users.py`)
 
 OpenAPI(実装から自動生成): apiのコンテナの中の`http://localhost:8080/openapi.json`(リバースプロキシでは公開しない。`docker compose exec api python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8080/openapi.json').read().decode())"`で取り出せる)
 - 役割分担: このドキュメント=判断の理由と処理の手順、OpenAPI=入出力の型・各項目の説明・例・ステータスごとのcode
@@ -37,7 +37,7 @@ OpenAPI(実装から自動生成): apiのコンテナの中の`http://localhost:
 - 403(権限がない): 認証はできたが、トークンのユーザーが管理者でなく、かつパスパラメーターのuser_idが自分自身でない場合
   再ログインしても結果は変わらない
 - 403(`email_not_verified`): 同期API(`/users/{user_id}/sessions/...`)は、トークンのユーザーのメールアドレスの確認が
-  済んでいなければ403にする(ログインはできるが同期はできない。確認コードはブロック3で実装)
+  済んでいなければ403にする(ログインはできるが同期はできない。確認は下記「メールアドレスの確認のendpoints」)
 - 上記の順に判定するので、一般ユーザーに404("user_not_found")が返ることはない(他ユーザーのuser_idを指定すると403で止まり、
   自分自身のユーザーが存在しなければ401で止まる)。404("user_not_found")が返るのは管理者が存在しないuser_idを指定した場合のみで、
   一般ユーザーには他ユーザーの存在有無が分からない
@@ -416,7 +416,7 @@ OpenAPI(実装から自動生成): apiのコンテナの中の`http://localhost:
             - session_idsが存在し、配列である
             - session_idsの要素が全てUUID型である
 
-## 認証のendpoints(ブロック2)
+## 認証のendpoints
 
 トークンを返すendpoint(signup・login・refresh)のレスポンスは共通の形式にする:
     ```
@@ -482,11 +482,11 @@ UUIDを受け取る(ハードウェアの情報はOSが提供しないため)。
     レスポンス: 200 { "id", "email", "display_name", "email_verified", "role", "created_at" }
 
 - PATCH /users/me
-    body: { "display_name": "..." }   (1〜50文字。それ以外の項目は422。メールアドレスの変更は11月以降、
-          パスワードの変更はブロック3の別のendpoint)
+    body: { "display_name": "..." }   (1〜50文字。それ以外の項目は422。メールアドレスの変更は未実装(予定)、
+          パスワードの変更は下記の別のendpoint)
     レスポンス: 200 + GET /users/meと同じ形式
 
-- PUT /users/me/password(ブロック3。2026-10-14に設計)
+- PUT /users/me/password(2026-10-14に設計)
     body: { "current_password": "...", "new_password": "..." }
         - new_password: サインアップと同じ条件(8〜128文字)。今と同じパスワードも受け付ける
     レスポンス: 204
@@ -513,7 +513,7 @@ UUIDを受け取る(ハードウェアの情報はOSが提供しないため)。
         - 他の端末は次のリクエストで401(`unauthenticated`)になる
         - 将来のローカルアカウントへの変更(通常→ローカル)は、このendpointでサーバーのデータを削除し、端末のデータを残す形で行う
 
-## メールアドレスの確認のendpoints(ブロック3)
+## メールアドレスの確認のendpoints
 
 設計(テーブル・流れ・判断の理由)は`backend/docs/バックエンド構成.md`の「メールアドレスの確認コード」。
 確認コードは6桁の数字で、有効期限は10分。サインアップ時に自動で送り、届かなければ再送する。
