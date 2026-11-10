@@ -145,7 +145,6 @@ flutter run
 | `backend/docs/メール.md` | メール送信の基盤(outbox + worker)、メールアドレスの確認コード | メール送信を触る |
 | `backend/docs/ログと監査ログ.md` | アクセスログ・アプリのログ・監査ログ | ログ・監査ログを触る |
 | `backend/docs/HTTPSとリバースプロキシ.md` | リバースプロキシ(nginx)・証明書(mkcert)・TLSの設定・送信元のIPとリクエストID・流量などの上限 | `backend/proxy/`・composeのポート・証明書・接続先のURLを触る、アプリがAPIにつながらない |
-| `backend/docs/メール送信の運用.md` | メールをサーバーから送って運用するための論点(送信手段・到達性・バウンス・outbox・悪用対策・テスト)の整理 | メール送信の設計・実装をする |
 
 ## 5. 開発・運用ルール
 
