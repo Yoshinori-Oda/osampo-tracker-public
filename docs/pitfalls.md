@@ -20,6 +20,16 @@
   `flutter analyze`で`duplicate_definition`エラーになるので、`updateSessionInfo()`のように
   別名にすること
 
+## 位置情報 (geolocator)
+
+- `Geolocator.getCurrentPosition`の呼び出しを重ねないこと。iOS(geolocator_apple 2.4.3未満。2.4.3で修正)は
+  結果の受け取り先を1つしか持たず、先の呼び出しが終わる前に次を呼ぶと受け取り先が上書きされ、先の呼び出しは
+  `timeLimit`まで返らずに`TimeoutException`になる(Dart側の`timeLimit`で諦めてもネイティブ側の要求は残るので、
+  時間切れになった呼び出しの後に呼ぶ場合も同じ)。位置情報ストリームの購読の停止・開始は影響しない。
+  収録の停止時に終了地点を`getCurrentPosition`で取っていた頃、停止による購読の切り替え(`_startPositionStream`の
+  初期位置の取得)と重なって終了地点がほぼ毎回取れない不具合が実際に発生した。いまは終了地点を、停止後に
+  受信した位置(ストリーム・初期位置の取得)から取っている(`docs/design/location-tracking.md`)
+
 ## 地図 (flutter_map)
 
 - `flutter_map`の`TileLayer`表示中に、`build()`内の`addPostFrameCallback`から
