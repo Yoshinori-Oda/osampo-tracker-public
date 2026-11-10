@@ -6,7 +6,7 @@
 // - ローカルアカウント「デモ」で入るので同期は走らず、認証のバナーも出ない
 // - 収録中の画面は撮らない(GPSが動いている必要があるため手動で撮る)
 // - 実行中はシミュレータの位置情報を動かしておくこと(止まっていると10秒で「位置情報の更新が止まっています」の
-//   バナーが全タブに出る)。手順はdocs/testing/e2e.mdの「機能紹介用のスクリーンショット」
+//   バナーが全タブに出る)。手順はfrontend/docs/e2e.mdの「機能紹介用のスクリーンショット」
 import 'dart:math';
 
 import 'package:drift/drift.dart' show Value;
@@ -292,7 +292,7 @@ Future<RecordingSession> _seedJustRecordedSession(AppDatabase db, Random rng) as
 
 // ---- 撮影 ---------------------------------------------------------------------
 
-// flutter_mapのタイルはpumpAndSettle()では待てないので、実時間で待つ(docs/testing/e2e.md)
+// flutter_mapのタイルはpumpAndSettle()では待てないので、実時間で待つ(frontend/docs/e2e.md)
 Future<void> _waitForMapTiles(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 4));
   await tester.pumpAndSettle();

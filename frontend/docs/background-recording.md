@@ -30,7 +30,7 @@ geolocatorの購読設定だけでプロセスを生かし続け、既存のDart
   `_monitoringStartedAt`(監視を再開した時刻)を起点に10秒の猶予を置く。`startRecording()`の
   15秒フォールバック判定は従来通り実際の最終受信時刻(`_lastGoodPositionAt`)で行う
 - 一部のAndroid端末(独自のバッテリー最適化を持つメーカー)は、Foreground Serviceでもプロセスごと
-  終了させることがある。その場合は`docs/design/session-recovery.md`の経路で保存/破棄させる
+  終了させることがある。その場合は`frontend/docs/session-recovery.md`の経路で保存/破棄させる
 - 動作確認は実機、または位置の移動をシミュレートしたシミュレータ/エミュレータで行う
   (iOSシミュレータは`Features > Location > City Run`、Androidエミュレータは
   Extended controlsのRoutes)。収録中にホームへ戻り、数分後に復帰して軌跡が途切れていないかを見る

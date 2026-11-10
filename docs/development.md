@@ -132,11 +132,11 @@ flutter run
 | `docs/commands.md` | 場面ごとのコマンド集(準備・起動・DBの作り直し・チェック・ログ・管理用のコマンド) | コマンドを探す |
 | `docs/basic-design/` | 基本設計書(システム概要・機能一覧・画面一覧と遷移・データ設計・API一覧・認証とセキュリティ)。全体像と一覧に徹し、詳細は下記の各文書へリンクする | 全体像を掴む、機能・画面・テーブル・APIを追加/削除する(該当の一覧も更新する) |
 | `docs/design/sync.md` | pull型差分同期、tombstone削除、削除と編集の競合 | `repositories/`・`backend/`を触る |
-| `docs/design/location-tracking.md` | RecordingPhase、timeLimit、位置情報バナー、収録開始のフォールバック、権限喪失時の強制停止 | `tracking_service.dart`・バナー・`main_page`/`recording_page`を触る |
-| `docs/design/background-recording.md` | バックグラウンドでの収録継続と非収録時の購読停止 | 位置情報の購読設定・ライフサイクル・権限・マニフェストを触る |
-| `docs/design/session-recovery.md` | 起動時の未完了セッション回収、保存/破棄画面 | 収録停止〜保存/破棄の流れを触る |
-| `docs/design/screens.md` | 各画面・バナー・utilsの個別仕様(編集ダイアログの挙動等) | `views/`・`widgets/`・`utils/`を触る |
-| `docs/testing/e2e.md` | integration_testの書き方・スクリーンショット・実DBの後始末 | `integration_test/`を書く・直す |
+| `frontend/docs/location-tracking.md` | RecordingPhase、timeLimit、位置情報バナー、収録開始のフォールバック、権限喪失時の強制停止 | `tracking_service.dart`・バナー・`main_page`/`recording_page`を触る |
+| `frontend/docs/background-recording.md` | バックグラウンドでの収録継続と非収録時の購読停止 | 位置情報の購読設定・ライフサイクル・権限・マニフェストを触る |
+| `frontend/docs/session-recovery.md` | 起動時の未完了セッション回収、保存/破棄画面 | 収録停止〜保存/破棄の流れを触る |
+| `frontend/docs/screens.md` | 各画面・バナー・utilsの個別仕様(編集ダイアログの挙動等) | `views/`・`widgets/`・`utils/`を触る |
+| `frontend/docs/e2e.md` | integration_testの書き方・スクリーンショット・実DBの後始末 | `integration_test/`を書く・直す |
 | `backend/docs/API設計ドラフト.md` | APIサーバー(FastAPI)のエンドポイント・エラー形式・認証と権限 | APIを実装する、APIの仕様を変える |
 | `backend/docs/バックエンド構成.md` | 構成の選定理由・主な決定事項と、実装方針・起動の仕組み・マイグレーション・DBロール・パージ・テストの詳細設計 | `backend/`を触る |
 | `backend/docs/HTTPSとリバースプロキシ.md` | リバースプロキシ(nginx)・証明書(mkcert)・TLSの設定・送信元のIPとリクエストID・流量などの上限 | `backend/proxy/`・composeのポート・証明書・接続先のURLを触る、アプリがAPIにつながらない |
@@ -217,7 +217,7 @@ flowchart LR
   `scripts/run_e2e_tests.sh <run_id>`でもよい(`run_checks.sh <run_id> e2e`のラッパー)。
   デバイスの決定順は`-d <device_id>` > `E2E_DEVICE_ID`環境変数 > `run_checks.sh`冒頭の
   `DEFAULT_DEVICE_ID`。シナリオは`-e <path>`で変えられる(省略時は`integration_test/app_test.dart`。
-  機能紹介用のスクリーンショットは`integration_test/showcase_test.dart`)。シナリオの書き方は`docs/testing/e2e.md`
+  機能紹介用のスクリーンショットは`integration_test/showcase_test.dart`)。シナリオの書き方は`frontend/docs/e2e.md`
 - `integration_test`は実機/シミュレータの本物の`app.sqlite`に対して動く。**seedして保存した
   セッションは必ず`addTearDown`等で後始末すること**(実機の履歴・リモートDBが汚染される)
 - backend(どこから実行してもよい):

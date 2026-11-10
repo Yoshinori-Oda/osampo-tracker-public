@@ -1,7 +1,7 @@
 # 画面・UI部品の仕様メモ
 
 `frontend/lib/views/`・`widgets/`・`utils/`の個別の仕様。収録・保存/破棄の流れに関わるものは
-`docs/design/location-tracking.md`・`docs/design/session-recovery.md`を参照。
+`frontend/docs/location-tracking.md`・`frontend/docs/session-recovery.md`を参照。
 
 ## views/
 
@@ -12,7 +12,7 @@
   `startRecording`のブロックダイアログの両方から`widgets/gps_help_link.dart`経由でリンクしている
 - save_or_discard_page.dart: 収録停止後の保存/破棄画面。session_detail_view.dartの
   `SessionDetailTitle`/`SessionDetailBody`を流用して詳細画面と同じ見た目にしている
-  (詳細: `docs/design/session-recovery.md`の「保存/破棄画面」)
+  (詳細: `frontend/docs/session-recovery.md`の「保存/破棄画面」)
 - settings_page.dart: 設定タブ(2026-10-14に設計)。今はアカウントの欄のみ(「このアプリについて」(ライセンス・プライバシーポリシー等)は
   仕上げで作る。アカウントとアプリの操作の設定を別のタブに分ける再構成は将来)
   - 並び: 表示名(タップで編集ダイアログ。1〜50文字) → メールアドレスと確認状態(未確認ならタップで確認コードの入力画面) →

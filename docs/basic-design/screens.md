@@ -1,8 +1,8 @@
 # 画面一覧・画面遷移
 
 基本設計書の3本目。アプリの画面・ダイアログ・バナーの一覧と、画面の遷移をまとめる。2026-10-15時点のmainの実装を正とする。
-画面ごとの細かい挙動(入力の検証・エラーの表示等)は`docs/design/screens.md`、収録・保存/破棄の流れは
-`docs/design/location-tracking.md`・`docs/design/session-recovery.md`を参照。機能ID(F-xxx)は`features.md`のもの。
+画面ごとの細かい挙動(入力の検証・エラーの表示等)は`frontend/docs/screens.md`、収録・保存/破棄の流れは
+`frontend/docs/location-tracking.md`・`frontend/docs/session-recovery.md`を参照。機能ID(F-xxx)は`features.md`のもの。
 
 ## 画面構成の方針
 
@@ -92,7 +92,7 @@ flowchart TD
   スナックバー「保存/破棄が必要なセッションがあります」を出す。その「収録画面へ」で収録タブに切り替えてから開く
   (`tracking_service.dart`の`_presentPendingCompletion()`)
 - 保存/破棄(S-17)は×で閉じられるが、保存か破棄をするまで収録は「停止処理中」のまま残る。収録タブの「前回のセッションを処理」ボタンと
-  共通のバナーから開き直せる(`docs/design/session-recovery.md`)
+  共通のバナーから開き直せる(`frontend/docs/session-recovery.md`)
 - 起動時の未完了の収録が複数あるときは、保存/破棄(S-17)を1件ずつ差し替えて順に出す
 - ログアウト・アカウントの削除・アカウントの切り替え・通常のアカウントにするは収録中はできない(スナックバーで止める)。
   ローカルアカウントにするはユーザーIDが変わらないので収録中もできる
