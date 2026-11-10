@@ -1,4 +1,4 @@
-"""認証・ユーザーのリクエスト/レスポンスの型と入力チェック。仕様はbackend/docs/API設計ドラフト.mdの「認証のendpoints」。"""
+"""認証・ユーザーのリクエスト/レスポンスの型と入力チェック。仕様はbackend/docs/認証.mdの「エンドポイント」。"""
 
 import uuid
 from datetime import datetime

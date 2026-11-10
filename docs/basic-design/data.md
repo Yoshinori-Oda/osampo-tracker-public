@@ -218,7 +218,7 @@ erDiagram
 
 ## 端末とサーバーの対応
 
-同期では、記録を次のように変換してやり取りする。APIの形は`backend/docs/API設計ドラフト.md`。
+同期では、記録を次のように変換してやり取りする。APIの形はOpenAPIと`backend/docs/同期API.md`。
 
 | 端末(`sessions` / `track_points`) | サーバー | 備考 |
 |---|---|---|

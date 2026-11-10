@@ -1,6 +1,6 @@
 """認証(/api/auth)・自分のアカウント(/api/users/me)と、同期APIの認証のテスト。
 
-仕様はbackend/docs/API設計ドラフト.mdの「認証と権限」「認証のendpoints」。
+仕様はbackend/docs/バックエンド概要.mdの「認証と権限」とbackend/docs/認証.mdの「エンドポイント」。
 """
 
 import uuid

@@ -146,7 +146,6 @@ apiの応答がSMTPサーバーの遅延・障害の影響を受けず、送信�
 | `frontend/docs/location-tracking.md` | 収録の状態遷移・位置情報のバナー |
 | `frontend/docs/background-recording.md` | バックグラウンドでの収録 |
 | `frontend/docs/session-recovery.md` | 起動時の未完了セッションの回収 |
-| `backend/docs/API設計ドラフト.md` | APIの仕様 |
 | `backend/docs/バックエンド概要.md` | バックエンドの構成・主な決定事項・実装方針・設定・起動・テスト |
 | `backend/docs/DBとマイグレーション.md` | マイグレーション・DBのロール・行レベルセキュリティ(RLS) |
 | `backend/docs/同期API.md` | 同期APIのサーバー側の実装・パージ |

@@ -1,4 +1,4 @@
-"""同期APIの業務ルール(再送の判定・削除と編集の競合・復活など)。仕様はbackend/docs/API設計ドラフト.mdを参照。
+"""同期APIの業務ルール(再送の判定・削除と編集の競合・復活など)。仕様はbackend/docs/同期API.mdを参照。
 
 時刻はDBのclock_timestamp()(実行した瞬間のサーバー時刻)を正とする。端末の時計は使わない。
 処理を続けられない場合はAppErrorを投げる(routersで共通の形式のエラーレスポンスになる)。
@@ -30,7 +30,7 @@ from app.schemas.session import (
 
 logger = logging.getLogger(__name__)
 
-# 再送の判定で、同じsessionかどうかを見分けるのに使う不変の項目(API設計書の特定項目*1)
+# 再送の判定で、同じsessionかどうかを見分けるのに使う不変の項目(backend/docs/同期API.mdの特定項目*1)
 IMMUTABLE_FIELDS = (
     "started_at",
     "ended_at",
@@ -40,7 +40,7 @@ IMMUTABLE_FIELDS = (
     "max_altitude",
     "min_altitude",
 )
-# 端末で編集できる可変の項目(API設計書の特定項目*2)
+# 端末で編集できる可変の項目(backend/docs/同期API.mdの特定項目*2)
 MUTABLE_FIELDS = ("name", "move_method", "is_favorite")
 
 # track_pointsを1つのINSERT文でまとめて登録する件数(1文あたりのパラメーター数の上限を超えないようにするため)
@@ -235,7 +235,7 @@ async def _resolve_resent_session(
     existing: TrackingSession,
     now: datetime,
 ) -> tuple[int, datetime]:
-    """同じidのレコードが既にある場合の判定(API設計書のPOSTの手順8)。"""
+    """同じidのレコードが既にある場合の判定(backend/docs/同期API.mdのPOSTの手順2)。"""
     # 他ユーザーのレコード(管理者だけが見える)、または不変の項目が違う場合は別のsession(idの衝突)とみなす。
     # 他ユーザーのレコードは中身を比べない(他ユーザーのデータの内容を探る手段にしないため)
     if existing.user_id != user_id:

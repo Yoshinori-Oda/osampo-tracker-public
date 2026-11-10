@@ -3,7 +3,7 @@
 基本設計書の2本目。アプリ・バックエンドが提供する機能を一覧にする。2026-10-15時点のmainの実装を正とし、
 未実装の機能は「予定」の節に分ける。予定の日程・進み具合はここには書かない。
 
-画面ごとの細かい挙動は`frontend/docs/screens.md`ほか、APIの仕様は`backend/docs/API設計ドラフト.md`を参照。
+画面ごとの細かい挙動は`frontend/docs/screens.md`ほか、APIの仕様は`docs/basic-design/api.md`を参照。
 
 ## 利用者
 

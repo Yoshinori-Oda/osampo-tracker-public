@@ -1,7 +1,7 @@
 # 同期・削除の設計
 
 関連: `frontend/lib/repositories/tracking_repository.dart`・`backend/app/services/session_service.py`・
-`backend/app/services/purge_service.py`。APIの仕様は`backend/docs/API設計ドラフト.md`、端末側の約束は
+`backend/app/services/purge_service.py`。APIの処理は`backend/docs/同期API.md`、端末側の約束は
 `frontend/docs/ユーザー機能追加に伴う変更予定.md`。
 
 このアプリは「複数端末・同一ユーザーでの同時操作は想定しない」前提で、シンプルな

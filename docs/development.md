@@ -137,7 +137,6 @@ flutter run
 | `frontend/docs/session-recovery.md` | 起動時の未完了セッション回収、保存/破棄画面 | 収録停止〜保存/破棄の流れを触る |
 | `frontend/docs/screens.md` | 各画面・バナー・utilsの個別仕様(編集ダイアログの挙動等) | `views/`・`widgets/`・`utils/`を触る |
 | `frontend/docs/e2e.md` | integration_testの書き方・スクリーンショット・実DBの後始末 | `integration_test/`を書く・直す |
-| `backend/docs/API設計ドラフト.md` | APIサーバー(FastAPI)のエンドポイント・エラー形式・認証と権限 | APIを実装する、APIの仕様を変える |
 | `backend/docs/バックエンド概要.md` | backendの構成の選定理由・主な決定事項・実装方針・設定と秘密情報・起動の仕組み・テスト | `backend/`を触る |
 | `backend/docs/DBとマイグレーション.md` | スキーマとマイグレーション、DBのロールと接続、行レベルセキュリティ(RLS) | テーブル・マイグレーション・DBの権限を触る |
 | `backend/docs/同期API.md` | 同期APIのサーバー側の実装、削除済みのセッションのパージ(worker) | 同期APIを触る |

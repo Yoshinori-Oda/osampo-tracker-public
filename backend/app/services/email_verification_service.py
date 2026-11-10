@@ -1,7 +1,7 @@
 """メールアドレスの確認コードの送信と確認。
 
-設計はbackend/docs/メール.mdの「メールアドレスの確認コード」、仕様はbackend/docs/API設計ドラフト.mdの
-「メールアドレスの確認のendpoints」。時刻はDBのclock_timestamp()を正とする。
+設計はbackend/docs/メール.mdの「メールアドレスの確認コード」、仕様はbackend/docs/メール.mdの
+「エンドポイント」。時刻はDBのclock_timestamp()を正とする。
 """
 
 import math

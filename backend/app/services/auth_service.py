@@ -1,6 +1,6 @@
 """認証の業務ルール(サインアップ・ログイン・トークンの更新・ログアウト・アクセストークンの検証・アカウントの操作)。
 
-設計はbackend/docs/認証.mdの「認証」、仕様はbackend/docs/API設計ドラフト.mdの「認証のendpoints」。
+設計はbackend/docs/認証.mdの「認証」、仕様はbackend/docs/認証.mdの「エンドポイント」。
 時刻はDBのclock_timestamp()を正とする(同期APIと同じ)。
 """
 

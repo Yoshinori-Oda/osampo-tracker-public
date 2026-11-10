@@ -1,6 +1,6 @@
 import '../../auth/auth_service.dart';
 
-// APIのエラー(code)を画面に出すメッセージにする。codeの一覧はbackend/docs/API設計ドラフト.md
+// APIのエラー(code)を画面に出すメッセージにする。codeの一覧はAPIのOpenAPI(backend/docs/バックエンド概要.mdの「API(共通)」)
 
 // 試行回数の上限(429)のときの「いつ試せるか」。Retry-Afterが無ければ「しばらくしてから」にする
 String _retryLater(AuthException e) {

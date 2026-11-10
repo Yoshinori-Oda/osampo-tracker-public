@@ -99,6 +99,5 @@ flowchart LR
 | [基本設計書](docs/basic-design/system-overview.md) | システム概要、[機能一覧](docs/basic-design/features.md)、[画面](docs/basic-design/screens.md)、[データ](docs/basic-design/data.md)、[API一覧](docs/basic-design/api.md)、[認証・セキュリティ](docs/basic-design/security.md) |
 | [同期の設計](docs/design/sync.md) | 端末とサーバーの差分同期、削除と編集の競合 |
 | [詳細設計(アプリ)](frontend/docs/) | 位置情報の収録、バックグラウンドでの収録、未完了の収録の回収、画面ごとの仕様 |
-| [API設計](backend/docs/API設計ドラフト.md) | エンドポイント、エラー形式、認証と権限 |
 | [バックエンドの設計](backend/docs/バックエンド概要.md) | 構成の選定理由、主な決定事項、実装方針と、機能ごとの設計(DB・同期API・認証・メール・ログ・HTTPS) |
 | [E2Eテスト](frontend/docs/e2e.md) | integration_testの書き方、スクリーンショットの撮り方 |

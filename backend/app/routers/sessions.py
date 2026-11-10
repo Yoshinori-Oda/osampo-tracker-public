@@ -1,4 +1,4 @@
-"""同期API(/api/users/{user_id}/sessions)。仕様はbackend/docs/API設計ドラフト.mdを参照。
+"""同期API(/api/users/{user_id}/sessions)。仕様はbackend/docs/同期API.mdを参照。
 
 ここではHTTPの受け口(パス・メソッド・ステータスコード・依存関係)だけを扱い、業務ルールはservices層に任せる。
 各エンドポイントのdocstringはOpenAPIの説明になる。
