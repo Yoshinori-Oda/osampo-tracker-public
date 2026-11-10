@@ -1,5 +1,5 @@
 # push(main)・PRごとに、backend(ruff・マイグレーション・alembic check・pytest)とfrontend(コード生成物の確認・analyze・test)を
-# 並列に実行する。E2E(シミュレータが要る)はホストのfrontend/scripts/run_checks.shで行う。詳細はdocs/development.mdの「CI」
+# 並列に実行する。E2E(シミュレータが要る)はローカルのfrontend/scripts/run_checks.shで行う。詳細はdocs/development.mdの「CI・Dependabot」
 name: CI
 
 on:

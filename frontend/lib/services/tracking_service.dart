@@ -787,7 +787,7 @@ class TrackingService {
   // 終了地点は、別にGeolocator.getCurrentPositionを呼ばず、ストリーム(停止で購読を切り替えたときの
   // 初期位置の取得を含む)から受信する位置を使う。停止の直後は購読の切り替えで初期位置の
   // getCurrentPositionが呼ばれ、iOS(geolocator_apple 2.4.3未満)では呼び出しが重なると先の呼び出しが
-  // 完了しなくなるため(docs/pitfalls.md)
+  // 完了しなくなるため(frontend/docs/フロントエンド概要.md)
   Future<void> _addFinalPoint({required String sessionId, required DateTime recordedAt}) async {
     try {
       // .firstはこの時点で購読するので、この後に受信した位置だけが対象になる
