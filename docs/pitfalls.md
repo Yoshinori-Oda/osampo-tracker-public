@@ -61,7 +61,9 @@
   明示的にどこまで消費済みにするかを揃えること(このアプリでの対処は
   `docs/design/location-tracking.md`のバナーの項を参照)
 
-## ホスト/devcontainerの同時作業
+## AIエージェントのコンテナとホストでの同時作業
+
+AIコーディングエージェントをコンテナ(devcontainer)で動かす場合(`docs/development.md`の「AIコーディングエージェントを使った開発」)の落とし穴。
 
 - **`frontend`はdevcontainerとホストの両方からbind mountで同じファイルが見えるため、
   devcontainer側でVSCodeを開いたままにしていると、そのDart拡張が`pubspec.lock`等の
@@ -72,13 +74,12 @@
   `flutter`本体を含む外部パッケージが軒並み解決できなくなる(Xcodeのビルドログには
   "Missing package product"や大量の`isn't defined`エラーとして現れ、`flutter clean`や
   DerivedData削除を繰り返しても再現し続けるため原因が非常に分かりにくい)。
-  `osampo-tracker`直下・`frontend`直下いずれの`.vscode/settings.json`にも
+  リポジトリ直下・`frontend`直下いずれの`.vscode/settings.json`にも
   `"dart.runPubGetOnPubspecChanges": "never"`を設定済みなので、devcontainer側/ホスト側
   どちらのVSCodeでも有効になっているか確認すること。原因切り分け時は、ホスト側で
   `grep -o '"rootUri": *"[^"]*flutter[^"]*"' .dart_tool/package_config.json`を実行し、
   `rootUri`がホストパスかコンテナパスかを見ると早い。
-  (この不具合は誤った入れ子のdevcontainer定義で起動していた時期に、コンテナ内にFlutterが
-  あった状態で発生した。現在はコンテナにFlutterを入れない方針なので同じ経路では再発しない
+  (この不具合は、コンテナ内にFlutterがあった時期に発生した。現在はコンテナにFlutterを入れない方針なので同じ経路では再発しない
   はずだが、設定は念のため残しておく)
 
 ## backend(Docker Compose)

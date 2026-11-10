@@ -1,19 +1,8 @@
 # E2E/画面確認テスト (integration_test + flutter drive)
 
-`integration_test/`のシナリオを書く・直す際に読む。ホストでの実行方法とログの読み方は
-`docs/development.md`の「テスト」を参照。
-
-## 役割分担
-
-Claude Code はコンテナ内で動くためシミュレータ/実機を直接操作できない(そもそもコンテナに
-Flutterが無い)ため、次の役割分担で運用する:
-
-- ユーザー: ホスト側で`scripts/run_checks.sh <run_id> e2e`(または`run_e2e_tests.sh`)を実行して
-  テストシナリオを走らせる(実行と完了報告のみ担当)
-- Claude: シナリオ(`integration_test/*.dart`)のコード自体は書く。実行後は該当run_idの
-  `host_check_logs/.../screenshots/`(実行直後なら`frontend/integration_test_screenshots/`も
-  同じ内容)のスクリーンショットPNGをReadツールで開いて解析する(bind mount経由で、
-  ホストで生成したファイルがそのままコンテナから見える)
+`integration_test/`のシナリオを書く・直す際に読む。実行方法とログの読み方は
+`docs/development.md`の「テスト」を参照(AIコーディングエージェントを使う場合の分担は、同じ文書の
+「AIコーディングエージェントを使った開発」)。
 
 ## スクリーンショットの仕組み
 
@@ -52,8 +41,8 @@ Flutterが無い)ため、次の役割分担で運用する:
 ## 位置情報の注入
 
 - iOSシミュレータの位置情報操作(Xcodeの`Features > Location`、`xcrun simctl location`)は
-  macOSホスト専用の機能で、Linuxコンテナには`xcrun`/`simctl`自体が存在せず実行できない。
-  スクリプトやGPXファイルの作成はできるが、実行(位置の注入)は必ずホスト側で行うこと
+  macOS専用の機能。AIコーディングエージェントのコンテナ(Linux)には`xcrun`/`simctl`が無いので、
+  エージェントはスクリプトやGPXファイルの作成までを行い、実行(位置の注入)は開発者がホストで行う
 - Androidエミュレータは Extended controls の Routes で移動をシミュレートできる
 
 ## 機能紹介用のスクリーンショット
@@ -73,7 +62,7 @@ Flutterが無い)ため、次の役割分担で運用する:
 | `05a_detail_route`・`05b_detail_points`・`05c_detail_elevation` | 詳細(皇居外周ラン)のルート表示・全ピン表示・高度プロファイル |
 | `06a_analytics_month`・`06b_analytics_year`・`06c_analytics_all` | 統計の月・年・全期間。月は、月の前半に撮ると先月を出す。年は棒グラフを右端までスクロールして撮る |
 
-実行の手順(iOSシミュレータ、ホスト側):
+実行の手順(iOSシミュレータ):
 
 1. 実行中はシミュレータの位置を動かしておく。止まっていると10秒で「位置情報の更新が止まっています」の
    バナーが全タブに出る(出た場合はflutter driveのログに`[showcase] 警告`が出る)。皇居外周を走る経路の例:

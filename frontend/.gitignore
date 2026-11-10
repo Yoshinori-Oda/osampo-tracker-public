@@ -36,7 +36,7 @@ migrate_working_dir/
 # flutter drive (integration_test) が保存するスクリーンショット。実行のたびに変わる一時成果物
 /integration_test_screenshots/
 
-# scripts/run_checks.sh がホスト側の実行結果(ログ・SUMMARY.md・スクリーンショットのコピー)を保存する先
+# scripts/run_checks.sh の実行結果(ログ・SUMMARY.md・スクリーンショットのコピー)を保存する先
 /host_check_logs/
 
 # Symbolication related

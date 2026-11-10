@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# ホスト側でbackendの各種チェック(マイグレーション・スキーマの差分確認・lint・テスト)をdocker compose経由で実行し、
-# 結果をすべてファイルへ保存する。コンテナ(Claude Code)からはDockerを使えないため、ホストで実行した結果を
-# このログ経由で読ませる。frontend/scripts/run_checks.shのbackend版。
+# backendの各種チェック(マイグレーション・スキーマの差分確認・lint・テスト)をdocker compose経由で実行し、
+# 結果をすべてファイルへ保存する。後から読み返したり前回の実行と比べたりできるようにする。
+# frontend/scripts/run_checks.shのbackend版。
 #
 # 使い方(どこから実行してもよい):
 #   backend/scripts/run_checks.sh <run_id> [step...] [-t <test_path>]...
@@ -9,7 +9,7 @@
 #
 # step (記述順ではなく下記の順で実行する。省略時は migrate check lint test):
 #   lock     uv lock (pyproject.tomlの依存パッケージを変えた場合。uvのDockerイメージで実行する)
-#   up       docker compose up -d --build (依存パッケージ・Dockerfile・composeを変えた場合、初回起動時)
+#   up       docker compose up -d --build --wait (依存パッケージ・Dockerfile・composeを変えた場合、初回起動時)
 #   migrate  開発用・テスト用の両方のデータベースに alembic upgrade head する
 #   check    alembic check (モデルとDBのスキーマに差分が無いことの確認)
 #   lint     ruff check
@@ -17,9 +17,8 @@
 #   https    リバースプロキシ越しのHTTPSの確認(curlで証明書・ヘッダー・上限を確かめる。mkcert・curl・opensslが必要)
 #   all      up migrate check lint test https
 #
-# run_id: 「どの依頼に対応する実行結果か」を一意に特定するための相関トークン。
-#         テスト内容の説明ではなく、依頼ごとに変わるユニークな文字列を渡すこと
-#         (例: Claudeが依頼時に生成した a3f9c21b のような文字列)。
+# run_id: 実行を識別するための任意の文字列(結果のディレクトリ名に入る)。
+#         テスト内容の説明ではなく、実行ごとに変わる文字列を渡すこと(例: a3f9c21b)。
 #
 # 前提: backend/.env があること(項目は backend/docs/バックエンド構成.md)。up以外のstepはサービスが起動済みであること。
 #       httpsとupは、backend/secrets/tls/ にmkcertで作った証明書があること(backend/docs/HTTPSとリバースプロキシ.md)
@@ -133,8 +132,8 @@ echo "steps: $STEPS"
 echo "log dir: $RUN_DIR"
 
 # ---- 実行環境 ----------------------------------------------------------------
-# gitが使えない場合(コンテナ側で作ったworktreeをホストから開いていて、.gitの参照先パスが
-# ホストに存在しない等)は「なし」と誤表示せず、取得失敗であることとその理由を残す
+# gitが使えない場合(別の環境(コンテナ等)で作ったworktreeを開いていて、.gitの参照先パスが
+# 存在しない等)は「なし」と誤表示せず、取得失敗であることとその理由を残す
 if GIT_STATUS_OUTPUT="$(git status --porcelain 2>&1)"; then
   GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
   GIT_COMMIT="$(git rev-parse --short HEAD)"

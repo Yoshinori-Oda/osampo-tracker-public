@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ホスト側でflutterの各種チェック(静的解析・テスト・E2E等)を実行し、結果をすべてファイルへ保存する。
-# コンテナ(Claude Code)にはFlutterが無いため、ホストで実行した結果をこのログ経由で読ませる。
+# flutterの各種チェック(静的解析・テスト・E2E等)を実行し、結果をすべてファイルへ保存する。
+# 出力・サマリー・スクリーンショットを実行ごとのディレクトリに残し、後から読み返したり前回の実行と比べたりできるようにする。
 #
 # 使い方:
 #   scripts/run_checks.sh <run_id> [step...] [-d <device_id>] [-t <test_path>]... [-e <e2e_target>]
@@ -15,10 +15,9 @@
 #            (-e/--e2e-target で別のシナリオを指定できる。例: integration_test/showcase_test.dart)
 #   all      analyze test e2e
 #
-# run_id: 「どの依頼に対応する実行結果か」を一意に特定するための相関トークン。
-#         テスト内容の説明ではなく、依頼ごとに変わるユニークな文字列を渡すこと
-#         (例: Claudeが依頼時に生成した a3f9c21b のような文字列)。
-#         複数セッションでテストが前後しても、run_idで検索すれば取り違えない。
+# run_id: 実行を識別するための任意の文字列(結果のディレクトリ名に入る)。
+#         テスト内容の説明ではなく、実行ごとに変わる文字列を渡すこと(例: a3f9c21b)。
+#         複数の実行が前後しても、run_idで探せば取り違えない。
 #
 # e2eのデバイスの決定順: -d/--device指定 > E2E_DEVICE_ID環境変数 > 下記DEFAULT_DEVICE_ID
 #
@@ -160,8 +159,8 @@ echo "steps: $STEPS"
 echo "log dir: $RUN_DIR"
 
 # ---- 実行環境 ----------------------------------------------------------------
-# gitが使えない場合(コンテナ側で作ったworktreeをホストから開いていて、.gitの参照先パスが
-# ホストに存在しない等)は「なし」と誤表示せず、取得失敗であることとその理由を残す
+# gitが使えない場合(別の環境(コンテナ等)で作ったworktreeを開いていて、.gitの参照先パスが
+# 存在しない等)は「なし」と誤表示せず、取得失敗であることとその理由を残す
 if GIT_STATUS_OUTPUT="$(git status --porcelain 2>&1)"; then
   GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
   GIT_COMMIT="$(git rev-parse --short HEAD)"
