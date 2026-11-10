@@ -20,7 +20,7 @@
 # run_id: 実行を識別するための任意の文字列(結果のディレクトリ名に入る)。
 #         テスト内容の説明ではなく、実行ごとに変わる文字列を渡すこと(例: a3f9c21b)。
 #
-# 前提: backend/.env があること(項目は backend/docs/バックエンド構成.md)。up以外のstepはサービスが起動済みであること。
+# 前提: backend/.env があること(項目は backend/docs/バックエンド概要.md)。up以外のstepはサービスが起動済みであること。
 #       httpsとupは、backend/secrets/tls/ にmkcertで作った証明書があること(backend/docs/HTTPSとリバースプロキシ.md)
 #
 # 結果は backend/host_check_logs/<timestamp>_<run_id>_<PASSED|FAILED>/ に保存される:
@@ -117,7 +117,7 @@ LOG_ROOT="$BACKEND_DIR/host_check_logs"
 cd "$BACKEND_DIR"
 
 if [[ ! -f .env ]]; then
-  echo "エラー: $BACKEND_DIR/.env がありません(項目は backend/docs/バックエンド構成.md)" >&2
+  echo "エラー: $BACKEND_DIR/.env がありません(項目は backend/docs/バックエンド概要.md)" >&2
   exit 1
 fi
 

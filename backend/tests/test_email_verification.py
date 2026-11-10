@@ -1,6 +1,6 @@
 """メールアドレスの確認コード(/api/users/me/email-verification)のテスト。
 
-仕様はbackend/docs/API設計ドラフト.mdの「メールアドレスの確認のendpoints」、設計はbackend/docs/バックエンド構成.mdの
+仕様はbackend/docs/API設計ドラフト.mdの「メールアドレスの確認のendpoints」、設計はbackend/docs/メール.mdの
 「メールアドレスの確認コード」。メールはoutboxに積まれるだけで、SMTPには接続しない。
 """
 

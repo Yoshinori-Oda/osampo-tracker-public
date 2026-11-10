@@ -1,6 +1,6 @@
 """sessions・track_pointsに行レベルセキュリティ(RLS)をかけ、worker用のロールに権限を付ける
 
-設計はbackend/docs/バックエンド構成.mdの「行レベルセキュリティ(RLS)」。
+設計はbackend/docs/DBとマイグレーション.mdの「行レベルセキュリティ(RLS)」。
 - apiはトランザクションごとに今のユーザーのIDをset_config('app.user_id', ..., true)で渡す(app/db.py)。
   ポリシーは本人の行(管理者は全ての行)だけを許し、渡されていなければ何も見えない
 - worker用のロール(初回起動時のスクリプトで作る)には、ジョブで使うテーブル・操作だけを付け、sessionsはパージのポリシーで全行を許す

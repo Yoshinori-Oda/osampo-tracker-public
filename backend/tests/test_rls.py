@@ -1,4 +1,4 @@
-"""行レベルセキュリティ(RLS)とworker用のロールの権限のテスト。設計はbackend/docs/バックエンド構成.mdの「行レベルセキュリティ(RLS)」。
+"""行レベルセキュリティ(RLS)とworker用のロールの権限のテスト。設計はbackend/docs/DBとマイグレーション.mdの「行レベルセキュリティ(RLS)」。
 
 APIを通したテスト(test_sync_api.py等)はconftestのdb_sessionの外側のトランザクションの中で動き、commitがセーブポイントの確定になる。
 set_config(..., true)は外側のトランザクションが続く限り残るので、「commitの後に今のユーザーを渡し直す」ことはここで、

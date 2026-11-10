@@ -152,7 +152,7 @@ mkcert -cert-file secrets/tls/cert.pem -key-file secrets/tls/key.pem localhost 1
 
 proxyとapiの両方で取る。役割を分ける。
 
-| | proxyのアクセスログ | apiのアクセスログ(`バックエンド構成.md`の「ログ」) |
+| | proxyのアクセスログ | apiのアクセスログ(`ログと監査ログ.md`の「ログ」) |
 |---|---|---|
 | 説明すること | 通信として何が来て、proxyがどう応えたか(apiに届かなかったものも含む) | apiがリクエストをどう処理したか |
 | 主な項目 | 時刻・`request_id`・送信元のIP・メソッド・パスの型・ステータス・apiのステータス・受信/送信のバイト数・全体の時間・apiの応答時間・TLSのバージョン | `request_id`・`user_id`・IP・メソッド・パスの型・ステータス・`code`・時間 |

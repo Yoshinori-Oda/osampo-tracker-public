@@ -1,6 +1,6 @@
 """SMTPでのメールの送信と、失敗の振り分け(恒久的/一時的)。workerだけが使う。
 
-DBには触れない(outboxの業務ルールはapp/services/mail_service.py)。設計はbackend/docs/バックエンド構成.mdの「メール送信の基盤」。
+DBには触れない(outboxの業務ルールはapp/services/mail_service.py)。設計はbackend/docs/メール.mdの「メール送信の基盤」。
 """
 
 import asyncio

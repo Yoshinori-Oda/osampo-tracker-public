@@ -1,6 +1,6 @@
 """メールのoutbox: apiが送るメールを積み、workerが取り出して送る。
 
-設計はbackend/docs/バックエンド構成.mdの「メール送信の基盤」。時刻はDBのclock_timestamp()を正とする。
+設計はbackend/docs/メール.mdの「メール送信の基盤」。時刻はDBのclock_timestamp()を正とする。
 送信は「少なくとも1回」: SMTPサーバーが受け取った後、結果をcommitする前にworkerが落ちると、次の起動で同じメールをもう一度送る。
 """
 

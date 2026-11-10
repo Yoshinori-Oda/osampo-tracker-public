@@ -1,6 +1,6 @@
 """認証: usersの拡張と、端末ごとのログイン状態(auth_sessions)・リフレッシュトークン(refresh_tokens)
 
-設計はbackend/docs/バックエンド構成.mdの「認証」、仕様はbackend/docs/API設計ドラフト.mdの「認証のendpoints」。
+設計はbackend/docs/認証.mdの「認証」、仕様はbackend/docs/API設計ドラフト.mdの「認証のendpoints」。
 既存のユーザーはpassword_hashがnull(パスワードでログインできない)のままにし、開発用はシード(app.cli seed-dev)で設定する。
 
 Revision ID: 0004
