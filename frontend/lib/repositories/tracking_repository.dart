@@ -515,11 +515,12 @@ class TrackingRepository {
     return await onUpdateData();
   }
 
+  // 収録停止後の破棄。収録中(inProgress)のセッションはサーバーへ送らないので、
+  // ローカルの行を消すだけで同期は依頼しない
   Future<void> deleteRecordingSession({
     required RecordingSession session,
   }) async {
     await _db.deleteRecordingSession(session: session);
-    return await onUpdateData();
   }
 
   // 起動時リカバリ用: 孤立したinProgressセッションとそのtrackpoints

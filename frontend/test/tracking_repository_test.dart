@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test_tracking_01/database/app_database.dart';
 import 'package:test_tracking_01/models/move_method.dart';
+import 'package:test_tracking_01/models/recording_session.dart';
 import 'package:test_tracking_01/models/status.dart';
 import 'package:test_tracking_01/repositories/tracking_repository.dart';
 
@@ -318,6 +319,24 @@ void main() {
   });
 
   group('local', () {
+    test('収録停止後の破棄は、ローカルの行を消すだけで同期しない', () async {
+      await insertSession('s1', Status.inProgress);
+
+      await createRepository().deleteRecordingSession(session: RecordingSession(
+        sessionId: 's1',
+        startedAt: DateTime.utc(2026, 10, 1, 8),
+        endedAt: DateTime.utc(2026, 10, 1, 8, 30),
+        totalDistance: 2.0,
+        elapsedSeconds: 1800,
+        elevationGain: 12.5,
+        maxAltitude: 30.0,
+        minAltitude: 7.5,
+      ));
+
+      expect(await findSession('s1'), isNull);
+      expect(api.requests, isEmpty);
+    });
+
     test('endedのセッションを削除してもローカルだけで消さず、DELETEを送る対象にする', () async {
       await insertSession('s1', Status.ended);
 
