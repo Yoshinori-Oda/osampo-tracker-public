@@ -5,8 +5,8 @@ import '../../auth/auth_service.dart';
 import '../../providers/auth_providers.dart';
 import 'auth_error_messages.dart';
 
-// パスワードの変更画面(設定タブから開く)。仕様はdocs/design/screens.mdの「auth/change_password_page.dart」、
-// APIはbackend/docs/API設計ドラフト.mdの「PUT /users/me/password」
+// パスワードの変更画面(設定タブから開く)。仕様はfrontend/docs/screens.mdの「auth/change_password_page.dart」、
+// APIはbackend/docs/認証.mdの「PUT /users/me/password」
 class ChangePasswordPage extends ConsumerStatefulWidget {
   const ChangePasswordPage({super.key});
 

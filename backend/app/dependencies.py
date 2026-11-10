@@ -68,7 +68,7 @@ CurrentAuth = Annotated[AuthContext, Depends(get_auth_context)]
 async def verify_user_access(user_id: uuid.UUID, auth: CurrentAuth, db: DbSession) -> uuid.UUID:
     """同期APIで、パスパラメーターのuser_idのユーザーを操作してよいかを確認し、user_idを返す。
 
-    API設計書の「認証と権限」の順に判定する: 401(get_auth_context) → 403(forbidden) → 403(email_not_verified)
+    backend/docs/バックエンド概要.mdの「判定の順番」の順に判定する: 401(get_auth_context) → 403(forbidden) → 403(email_not_verified)
     → 404(user_not_found)。一般ユーザーは自分以外のuser_idを指定すると403で止まるので、他ユーザーの有無は分からない。
     他人のデータへのアクセスの拒否と、管理者による他のユーザーのデータへのアクセスは監査ログに残す(GETはcommitしないので、
     ここでcommitする)。

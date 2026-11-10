@@ -5,7 +5,7 @@ import 'package:test_tracking_01/auth/auth_service.dart';
 import 'package:test_tracking_01/providers/auth_providers.dart';
 import 'package:test_tracking_01/views/auth/email_verification_page.dart';
 
-// 確認コードの入力画面が、docs/design/screens.mdの「auth/email_verification_page.dart」の仕様どおりに動くことの確認。
+// 確認コードの入力画面が、frontend/docs/screens.mdの「auth/email_verification_page.dart」の仕様どおりに動くことの確認。
 // APIは呼ばず、AuthControllerを偽物に差し替えて、再発行・確認の結果を順番に返す
 
 class _FakeAuthController extends AuthController {

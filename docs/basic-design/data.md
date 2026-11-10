@@ -130,7 +130,7 @@ erDiagram
 | `auth_sessions` | 端末ごとのログイン状態(1回のログインで1行) | 同じユーザー・同じ端末の有効な行は1つだけ(部分一意インデックス)。`revoked_at`を入れると、その端末のトークンは全て使えなくなる |
 | `refresh_tokens` | リフレッシュトークン(更新のたびに1行) | トークンそのものは持たずSHA-256だけ。使用済み(`used_at`)の行は、再使用の検知のため有効期限まで残す |
 | `email_codes` | メールで送る確認コード(ユーザーと用途ごとに1行) | コードはargon2のハッシュだけ。間違えた回数・24時間の送信回数をここで数える。用途は今は`verify_email`だけ |
-| `audit_events` | 監査ログ(認証・アカウント・権限の出来事) | 追記のみ。正常な流れでも頻繁に起きる失敗(トークンの期限切れ・メール未確認の403等)は残さない。詳細は`backend/docs/バックエンド構成.md`の「監査ログ」 |
+| `audit_events` | 監査ログ(認証・アカウント・権限の出来事) | 追記のみ。正常な流れでも頻繁に起きる失敗(トークンの期限切れ・メール未確認の403等)は残さない。詳細は`backend/docs/ログと監査ログ.md`の「監査ログ」 |
 | `outbox_emails` | 送信待ちのメールと送信の記録 | apiは業務のデータと同じトランザクションで積むだけで、送るのはworker。送信に成功したら本文を消す(確認コードが平文で入るため) |
 
 外部キーは全て`ON DELETE CASCADE`にしている(`email_codes.outbox_email_id`だけ`SET NULL`)。アカウントを削除すると、そのユーザーの
@@ -147,7 +147,7 @@ erDiagram
 | マイグレーション用(`MIGRATOR_DB_USER`) | テーブルの作成・変更(テーブルの所有者) | Alembicのマイグレーション、`db/seed.sql`の投入 |
 | アプリ用(`APP_DB_USER`) | データの読み書き(SELECT / INSERT / UPDATE / DELETE)だけ | api・worker |
 
-ロールは`backend/db/init/`がDBコンテナの初回起動時に作る。詳細は`backend/docs/バックエンド構成.md`の「DBのロールと接続」。
+ロールは`backend/db/init/`がDBコンテナの初回起動時に作る。詳細は`backend/docs/DBとマイグレーション.md`の「DBのロールと接続」。
 
 ## 端末のデータ
 
@@ -218,7 +218,7 @@ erDiagram
 
 ## 端末とサーバーの対応
 
-同期では、記録を次のように変換してやり取りする。APIの形は`backend/docs/API設計ドラフト.md`。
+同期では、記録を次のように変換してやり取りする。APIの形はOpenAPIと`backend/docs/同期API.md`。
 
 | 端末(`sessions` / `track_points`) | サーバー | 備考 |
 |---|---|---|

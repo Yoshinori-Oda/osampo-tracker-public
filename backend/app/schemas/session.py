@@ -1,4 +1,4 @@
-"""同期APIのリクエスト/レスポンスの型と入力チェック。仕様はbackend/docs/API設計ドラフト.mdを参照。
+"""同期APIのリクエスト/レスポンスの型と入力チェック。仕様はbackend/docs/同期API.mdを参照。
 
 日時はタイムゾーン付き(AwareDatetime)のみ受け付ける("Z"や"+09:00"の無い日時は422)。
 各項目のdescription・examplesはOpenAPIのドキュメントになる。
@@ -26,7 +26,7 @@ class MoveMethod(StrEnum):
 
 SessionName = Annotated[str, StringConstraints(min_length=1, max_length=100)]
 
-# ---- OpenAPIの例(API設計書の例と同じ値) ------------------------------------------
+# ---- OpenAPIの例 ----------------------------------------------------------
 
 _SESSION_ID = "11111111-1111-1111-1111-111111111111"
 _TRACK_POINT_EXAMPLE = {

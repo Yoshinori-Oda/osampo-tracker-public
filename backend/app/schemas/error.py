@@ -41,7 +41,7 @@ class ErrorResponse(BaseModel):
     )
 
 
-# OpenAPIのレスポンスの説明に載せる、codeごとの意味(API設計書の「codeの一覧」と同じ内容)
+# OpenAPIのレスポンスの説明に載せる、codeごとの意味(codeの一覧の正。OpenAPIに載る)
 ERROR_CODE_DESCRIPTIONS: dict[ErrorCode, str] = {
     ErrorCode.UNAUTHENTICATED: "トークンが無い・不正・持ち主がいない",
     ErrorCode.TOKEN_EXPIRED: "アクセストークンの有効期限切れ(トークンを更新してやり直す)",

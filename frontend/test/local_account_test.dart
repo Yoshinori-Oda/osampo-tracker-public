@@ -7,7 +7,7 @@ import 'package:test_tracking_01/views/auth/local_account_list_page.dart';
 import 'package:test_tracking_01/views/auth/login_page.dart';
 
 // ローカルアカウントの選択画面と、ログイン画面のローカルアカウントへの導線・記録を移すログインの確認。
-// 仕様はfrontend/docs/ユーザー機能追加に伴う変更予定.mdの「ローカルアカウント」。APIは呼ばず、AuthControllerを偽物に差し替える
+// 仕様はfrontend/docs/フロントエンド概要.mdの「ローカルアカウント」。APIは呼ばず、AuthControllerを偽物に差し替える
 
 const _currentId = 'local-1';
 const _otherId = 'local-2';

@@ -13,7 +13,7 @@ import '../widgets/display_name_dialog.dart';
 
 // 設定タブ。今はアカウント(表示名の編集・メールアドレスの確認・パスワードの変更・ログアウト)と、一番下のアカウントの削除のみ。
 // ローカルアカウントでは、メールアドレス・パスワード・ログアウトの代わりにアカウントの切り替えと通常のアカウントへの変更を出す。
-// 仕様はdocs/design/screens.mdの「settings_page.dart」
+// 仕様はfrontend/docs/screens.mdの「settings_page.dart」
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 

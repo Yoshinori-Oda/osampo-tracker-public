@@ -1,6 +1,6 @@
 """監査ログ(audit_events)のテスト。どの操作で何を残すか(と、残さないもの)を確かめる。
 
-設計はbackend/docs/バックエンド構成.mdの「監査ログ」。
+設計はbackend/docs/ログと監査ログ.mdの「監査ログ」。
 """
 
 import uuid

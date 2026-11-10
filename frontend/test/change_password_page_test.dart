@@ -5,7 +5,7 @@ import 'package:test_tracking_01/auth/auth_service.dart';
 import 'package:test_tracking_01/providers/auth_providers.dart';
 import 'package:test_tracking_01/views/auth/change_password_page.dart';
 
-// パスワードの変更画面が、docs/design/screens.mdの「auth/change_password_page.dart」の仕様どおりに動くことの確認。
+// パスワードの変更画面が、frontend/docs/screens.mdの「auth/change_password_page.dart」の仕様どおりに動くことの確認。
 // APIは呼ばず、AuthControllerを偽物に差し替える
 
 class _FakeAuthController extends AuthController {

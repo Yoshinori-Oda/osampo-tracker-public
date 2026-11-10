@@ -1,4 +1,4 @@
-"""認証(/api/auth)。仕様はbackend/docs/API設計ドラフト.mdの「認証のendpoints」。"""
+"""認証(/api/auth)。仕様はbackend/docs/認証.mdの「エンドポイント」。"""
 
 from fastapi import APIRouter, Depends, Response, status
 

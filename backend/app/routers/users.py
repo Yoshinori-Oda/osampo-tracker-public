@@ -1,5 +1,5 @@
-"""自分のアカウント(/api/users/me)。仕様はbackend/docs/API設計ドラフト.mdの「認証のendpoints」
-「メールアドレスの確認のendpoints」。
+"""自分のアカウント(/api/users/me)。仕様はbackend/docs/認証.mdの「エンドポイント」と
+backend/docs/メール.mdの「エンドポイント」。
 
 将来、管理者向けに他ユーザーを操作する機能を作るときは、/api/users/{user_id} のendpointを別に追加する。
 """
