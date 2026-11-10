@@ -1,4 +1,4 @@
-"""ログ(リクエストID・アクセスログ・アプリのログ・整形)のテスト。設計はbackend/docs/ログと監査ログ.mdの「ログ」。"""
+"""ログ(リクエストID・アクセスログ・アプリのログ・整形)のテスト。設計はbackend/docs/logging.mdの「ログ」。"""
 
 import json
 import logging

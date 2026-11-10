@@ -43,7 +43,7 @@
 
 ## エンドポイント
 
-パスは`/users/{user_id}/sessions`の下。共通の判定(413・415・406・401・403・404 `user_not_found`・422)は`backend/docs/バックエンド概要.md`の
+パスは`/users/{user_id}/sessions`の下。共通の判定(413・415・406・401・403・404 `user_not_found`・422)は`backend/docs/overview.md`の
 「判定の順番」のとおりで、以下では業務ルールの部分だけを書く。端末とサーバーにまたがる流れは`docs/design/sync.md`。
 
 不変の項目と可変の項目を次のように呼ぶ(`app/services/session_service.py`):

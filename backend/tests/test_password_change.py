@@ -1,6 +1,6 @@
 """パスワードの変更(PUT /api/users/me/password)のテスト。
 
-仕様はbackend/docs/認証.mdの「エンドポイント」。
+仕様はbackend/docs/auth.mdの「エンドポイント」。
 """
 
 import uuid

@@ -14,8 +14,8 @@ import 'package:test_tracking_01/models/status.dart';
 import 'package:test_tracking_01/providers/auth_providers.dart';
 import 'package:test_tracking_01/widgets/auth_banner_view.dart';
 
-// 認証(AuthService・AuthorizedClient)がbackend/docs/認証.mdの「エンドポイント」を
-// frontend/docs/フロントエンド概要.mdの「認証とアカウント」のとおりに呼ぶことの確認
+// 認証(AuthService・AuthorizedClient)がbackend/docs/auth.mdの「エンドポイント」を
+// frontend/docs/overview.mdの「認証とアカウント」のとおりに呼ぶことの確認
 
 const _userId = '11111111-1111-1111-1111-111111111111';
 const _baseUrl = 'http://test/api';

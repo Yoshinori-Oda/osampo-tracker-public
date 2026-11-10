@@ -1,6 +1,6 @@
 """メール送信の基盤: 送信待ちのメールと送信の記録(outbox_emails)
 
-設計はbackend/docs/メール.mdの「メール送信の基盤」。apiが積み、workerが送る。
+設計はbackend/docs/mail.mdの「メール送信の基盤」。apiが積み、workerが送る。
 
 Revision ID: 0005
 Revises: 0004

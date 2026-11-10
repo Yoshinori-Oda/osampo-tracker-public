@@ -5,7 +5,7 @@ import 'package:http/testing.dart';
 import 'package:test_tracking_01/auth/request_id_client.dart';
 
 // RequestIdClientが、リクエストIDを送らず、応答のX-Request-IDと送った時刻を端末のログに出すことの確認
-// (backend/docs/HTTPSとリバースプロキシ.mdの「リクエストID」)
+// (backend/docs/https-proxy.mdの「リクエストID」)
 
 final _sentAt = DateTime.utc(2026, 11, 9, 1, 2, 3, 456);
 const _requestId = '0123456789abcdef0123456789abcdef';

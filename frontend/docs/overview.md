@@ -6,7 +6,7 @@ frontend(Flutterのモバイルアプリ)の概要。今は、認証とアカウ
 
 ## 認証とアカウント
 
-サーバー側の処理は`backend/docs/認証.md`・`backend/docs/メール.md`、画面の仕様は`frontend/docs/screens.md`、
+サーバー側の処理は`backend/docs/auth.md`・`backend/docs/mail.md`、画面の仕様は`frontend/docs/screens.md`、
 端末のデータは`docs/basic-design/data.md`。実装は`lib/auth/`(`auth_service.dart`・`auth_storage.dart`・`authorized_client.dart`)と
 `providers/auth_providers.dart`。
 

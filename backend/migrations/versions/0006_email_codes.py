@@ -1,6 +1,6 @@
 """メールアドレスの確認コード(email_codes)と、outboxの送信期限・取り消し
 
-設計はbackend/docs/メール.mdの「メールアドレスの確認コード」。
+設計はbackend/docs/mail.mdの「メールアドレスの確認コード」。
 - email_codes: ユーザーと用途ごとに1行の確認コード(送るたびに上書きする)
 - outbox_emails: send_deadline(この日時を過ぎたら送らない)と、statusのcancelled(古いコードのメールの取り消し)
 

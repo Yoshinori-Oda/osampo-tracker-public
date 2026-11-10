@@ -1,8 +1,8 @@
 # バックエンド概要
 
 backend(FastAPIのapi + 定期実行のworker + PostgreSQL)の構成・主な決定事項・実装方針・設定・起動・テスト。
-機能ごとの設計は同じディレクトリの各文書(`DBとマイグレーション.md`・`同期API.md`・`認証.md`・`メール.md`・`ログと監査ログ.md`・
-`HTTPSとリバースプロキシ.md`)にある。
+機能ごとの設計は同じディレクトリの各文書(`database.md`・`sync-api.md`・`auth.md`・`mail.md`・`logging.md`・
+`https-proxy.md`)にある。
 
 ## 構成の選定(2026-09-29決定)
 
@@ -30,7 +30,7 @@ FastAPIを選んだ理由:
 
 | サービス | 役割 |
 |---|---|
-| `proxy` | nginx。TLSを終端してHTTPSで公開し、`/api/`だけを`api`へ転送する(2026-11-09に追加。`backend/docs/HTTPSとリバースプロキシ.md`) |
+| `proxy` | nginx。TLSを終端してHTTPSで公開し、`/api/`だけを`api`へ転送する(2026-11-09に追加。`backend/docs/https-proxy.md`) |
 | `db` | PostgreSQL/PostGIS |
 | `api` | uvicornでFastAPIを常駐させ、エンドポイントを提供する(`restart: unless-stopped`) |
 | `worker` | `api`と同じイメージ・同じコードで、起動コマンドだけ変える。メール送信(outbox)とパージを定期実行する |
@@ -80,10 +80,10 @@ FastAPIを選んだ理由:
 - 認証の詳細(2026-10-07〜08に設計): パスワードは8〜128文字・MFAなし、アクセストークンはES256のJWT(15分)、
   リフレッシュトークンは256ビットの乱数(30日・使うたびに取り替え・使用済みが使われたらその端末のログイン状態を無効にする)、
   端末ごとのログイン状態とトークンの系列をセットで持ちアクセストークンも毎回DBで突き合わせる、アカウントの削除は関連データごと物理削除、
-  メールアドレスの確認前もログインできるが同期はできない。詳細は`backend/docs/認証.md`の「認証」
+  メールアドレスの確認前もログインできるが同期はできない。詳細は`backend/docs/auth.md`の「認証」
 - ゲストの代わりに**ローカルアカウント**(同期しないアカウント。複数作れる・通常のアカウントと相互に変更できる)を用意する
   (2026-10-08決定、2026-10-27設計)。ローカル→通常は新規登録に加えて既存の通常のアカウントへのログインでの合流もでき、
-  `users.id`の書き換えではなくsessionsの付け替えで行う。詳細は`frontend/docs/フロントエンド概要.md`の「ローカルアカウント」
+  `users.id`の書き換えではなくsessionsの付け替えで行う。詳細は`frontend/docs/overview.md`の「ローカルアカウント」
 
 ## 移植の方針
 
@@ -126,7 +126,7 @@ FastAPIを選んだ理由:
 APIの入出力の型・各項目の説明・例・ステータスごとの`code`は、実装から自動で生成するOpenAPIにある。この節と各機能の文書の
 「エンドポイント」には、OpenAPIに載らない判定の順番・処理の手順・判断の理由を書く。
 
-- URL: `https://localhost/api`(開発環境。リバースプロキシ経由。`backend/docs/HTTPSとリバースプロキシ.md`)。
+- URL: `https://localhost/api`(開発環境。リバースプロキシ経由。`backend/docs/https-proxy.md`)。
   実装は、同期が`app/routers/sessions.py`、認証・ユーザーが`app/routers/auth.py`・`app/routers/users.py`
 - OpenAPIはリバースプロキシでは公開しない。apiのコンテナの中から取り出す:
   `docker compose exec api python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8080/openapi.json').read().decode())"`。
@@ -146,7 +146,7 @@ APIの入出力の型・各項目の説明・例・ステータスごとの`code
 
 ### 認証と権限
 
-トークンの仕組みは`backend/docs/認証.md`。
+トークンの仕組みは`backend/docs/auth.md`。
 
 - ログイン・サインアップ・トークンの更新以外のエンドポイントは、`Authorization: Bearer <アクセストークン>`ヘッダーが必須
 - リクエストのたびに、トークンの署名・有効期限に加えて、DBで「ユーザーが存在し停止(`disabled_at`)されていない」
@@ -165,7 +165,7 @@ APIの入出力の型・各項目の説明・例・ステータスごとの`code
 ### リクエストID
 
 - 全てのレスポンスに`X-Request-ID`ヘッダーを付ける(アクセスログ・アプリのログ・監査ログの突き合わせに使う)。
-  IDはリバースプロキシが作り、クライアントが送ったものは使わない(`backend/docs/HTTPSとリバースプロキシ.md`の「リクエストID」)
+  IDはリバースプロキシが作り、クライアントが送ったものは使わない(`backend/docs/https-proxy.md`の「リクエストID」)
 - ログでの振り返りにだけ使い、処理(認証・重複の判定等)には使わない
 
 ### エラーレスポンス
@@ -210,12 +210,12 @@ APIの入出力の型・各項目の説明・例・ステータスごとの`code
   # 以下は省略可(既定値)
   # PURGE_RETENTION_DAYS=90
   # PURGE_INTERVAL_HOURS=24
-  # メール送信(SMTP_HOST等)も全て省略可。既定はcomposeの中のMailpit(`backend/docs/メール.md`の「メール送信の基盤」の「設定」)
+  # メール送信(SMTP_HOST等)も全て省略可。既定はcomposeの中のMailpit(`backend/docs/mail.md`の「メール送信の基盤」の「設定」)
   ```
 
   - ロール・パスワード・データベースはボリュームの初回作成時にだけ反映される。変えた場合は`docker compose down -v`で
     ボリュームを作り直す(作り直した後は`alembic upgrade head`とシードの投入が必要)
-- JWTの署名鍵は`backend/secrets/`に置く(`backend/docs/認証.md`の「認証」の「鍵・設定」)。SMTPの接続先は`backend/docs/メール.md`の「メール送信の基盤」の「設定」
+- JWTの署名鍵は`backend/secrets/`に置く(`backend/docs/auth.md`の「認証」の「鍵・設定」)。SMTPの接続先は`backend/docs/mail.md`の「メール送信の基盤」の「設定」
 
 ## 起動とヘルスチェック
 
@@ -224,7 +224,7 @@ APIの入出力の型・各項目の説明・例・ステータスごとの`code
 - 起動の順番は`depends_on`で決める:
   - `api`・`worker`は`db`の`healthcheck`が通ってから起動する(`condition: service_healthy`)
   - `worker`は`mailpit`が起動してから起動する(`condition: service_started`)
-  - `proxy`は`api`の`healthcheck`が通ってから起動する(起動直後の502を避ける。`backend/docs/HTTPSとリバースプロキシ.md`)
+  - `proxy`は`api`の`healthcheck`が通ってから起動する(起動直後の502を避ける。`backend/docs/https-proxy.md`)
   - `db`の`healthcheck`の`pg_isready`はTCP(`-h localhost`)で確かめる。ソケットで確かめると、ボリュームを作った直後の初回の起動で、
     初期化中の仮のサーバー(`docker-entrypoint-initdb.d`のスクリプトを実行する間、ソケットだけで待ち受ける)にも準備完了と答え、
     `api`・`worker`が接続できずにエラーになる。CIのサービスコンテナも同じ理由でTCPにしている
@@ -245,7 +245,7 @@ flowchart LR
 ```
 
 - DBのボリュームが空のとき(初回、`docker compose down -v`の後)だけ、dbは初期化してから起動する。
-  **テーブルはcomposeの起動では作られない**。マイグレーションは起動とは別に実行する(`backend/docs/DBとマイグレーション.md`の「スキーマとマイグレーション」)。
+  **テーブルはcomposeの起動では作られない**。マイグレーションは起動とは別に実行する(`backend/docs/database.md`の「スキーマとマイグレーション」)。
   workerはマイグレーションの前だとテーブルが無いエラーを出すが、マイグレーションの後の次の実行で回復する
 
 ```mermaid

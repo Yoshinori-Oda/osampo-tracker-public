@@ -1,8 +1,8 @@
 # 同期・削除の設計
 
 関連: `frontend/lib/repositories/tracking_repository.dart`・`backend/app/services/session_service.py`・
-`backend/app/services/purge_service.py`。APIの処理は`backend/docs/同期API.md`、同期を行う条件(ログイン・メールアドレスの確認)は
-`frontend/docs/フロントエンド概要.md`の「認証とアカウント」。
+`backend/app/services/purge_service.py`。APIの処理は`backend/docs/sync-api.md`、同期を行う条件(ログイン・メールアドレスの確認)は
+`frontend/docs/overview.md`の「認証とアカウント」。
 
 このアプリは「複数端末・同一ユーザーでの同時操作は想定しない」前提で、シンプルな
 pull型差分同期(`updated_at`ベース)を採用している。設計の要点:

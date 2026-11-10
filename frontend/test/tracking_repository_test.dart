@@ -11,7 +11,7 @@ import 'package:test_tracking_01/models/recording_session.dart';
 import 'package:test_tracking_01/models/status.dart';
 import 'package:test_tracking_01/repositories/tracking_repository.dart';
 
-// 同期処理(TrackingRepository)が同期API(backend/docs/同期API.md)を
+// 同期処理(TrackingRepository)が同期API(backend/docs/sync-api.md)を
 // docs/design/sync.md のとおりに呼ぶことの確認。
 // APIはMockClientで偽装し、ローカルDBはメモリ上のDriftを使う
 

@@ -7,7 +7,7 @@ Thumbs.db
 *.iml
 
 # backend (Python)
-# 秘密情報を含むのでコミットしない (項目は backend/docs/バックエンド概要.md の「設定と秘密情報」)
+# 秘密情報を含むのでコミットしない (項目は backend/docs/overview.md の「設定と秘密情報」)
 backend/.env
 # アクセストークンを署名するES256の鍵のペア
 backend/secrets/

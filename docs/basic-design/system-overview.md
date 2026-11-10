@@ -47,7 +47,7 @@ flowchart LR
 | モバイルアプリ | 位置情報の収録、記録の閲覧・編集・統計、ログイン・登録、サーバーとの同期 | `frontend/`(Flutter / Riverpod) |
 | ローカルDB | 収録したセッションと位置情報の点を保存する。ログインしたユーザーごとにデータを分ける | `frontend/lib/database/`(Drift / SQLite) |
 | トークンの保存領域 | アクセストークン・リフレッシュトークンを保存する。パスワードは端末に保存しない | `frontend/lib/auth/auth_storage.dart`(flutter_secure_storage) |
-| proxy | リバースプロキシ。TLSを終端してHTTPSで公開し、`/api/`だけをapiへ転送する。送信元のIP・リクエストIDの付与、流量・大きさ・時間の上限、アクセスログ | `backend/proxy/`(nginx)。詳細は`backend/docs/HTTPSとリバースプロキシ.md` |
+| proxy | リバースプロキシ。TLSを終端してHTTPSで公開し、`/api/`だけをapiへ転送する。送信元のIP・リクエストIDの付与、流量・大きさ・時間の上限、アクセスログ | `backend/proxy/`(nginx)。詳細は`backend/docs/https-proxy.md` |
 | api | REST APIを提供する(認証・ユーザー・セッションの同期・ヘルスチェック) | `backend/app/`(FastAPI)。`main.py`・`routers/` |
 | worker | 定期実行のジョブ。outboxのメールの送信(5秒ごと)と、期限切れデータのパージ(24時間ごと) | `backend/app/worker.py`。apiと同じイメージで起動コマンドだけ変える。ジョブの重複を避けるため1つだけ起動する |
 | db | サーバー側のデータ(ユーザー・ログイン状態・セッション・位置情報の点・メール)を保存する | PostgreSQL 16 + PostGIS。スキーマはAlembic(`backend/migrations/`)で管理 |
@@ -146,10 +146,10 @@ apiの応答がSMTPサーバーの遅延・障害の影響を受けず、送信�
 | `frontend/docs/location-tracking.md` | 収録の状態遷移・位置情報のバナー |
 | `frontend/docs/background-recording.md` | バックグラウンドでの収録 |
 | `frontend/docs/session-recovery.md` | 起動時の未完了セッションの回収 |
-| `backend/docs/バックエンド概要.md` | バックエンドの構成・主な決定事項・実装方針・設定・起動・テスト |
-| `backend/docs/DBとマイグレーション.md` | マイグレーション・DBのロール・行レベルセキュリティ(RLS) |
-| `backend/docs/同期API.md` | 同期APIのサーバー側の実装・パージ |
-| `backend/docs/認証.md` | 認証・ログインの試行回数の制限 |
-| `backend/docs/メール.md` | メール送信の基盤・メールアドレスの確認コード |
-| `backend/docs/ログと監査ログ.md` | アクセスログ・アプリのログ・監査ログ |
-| `backend/docs/HTTPSとリバースプロキシ.md` | リバースプロキシ(nginx)・証明書・TLSの設定・送信元のIPとリクエストID・流量などの上限 |
+| `backend/docs/overview.md` | バックエンドの構成・主な決定事項・実装方針・設定・起動・テスト |
+| `backend/docs/database.md` | マイグレーション・DBのロール・行レベルセキュリティ(RLS) |
+| `backend/docs/sync-api.md` | 同期APIのサーバー側の実装・パージ |
+| `backend/docs/auth.md` | 認証・ログインの試行回数の制限 |
+| `backend/docs/mail.md` | メール送信の基盤・メールアドレスの確認コード |
+| `backend/docs/logging.md` | アクセスログ・アプリのログ・監査ログ |
+| `backend/docs/https-proxy.md` | リバースプロキシ(nginx)・証明書・TLSの設定・送信元のIPとリクエストID・流量などの上限 |

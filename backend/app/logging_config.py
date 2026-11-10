@@ -1,6 +1,6 @@
 """ログの出力の設定(api・worker共通)。
 
-設計はbackend/docs/ログと監査ログ.mdの「ログ」。Python標準のloggingに、整形(Formatter)を2種類足しただけのもの。
+設計はbackend/docs/logging.mdの「ログ」。Python標準のloggingに、整形(Formatter)を2種類足しただけのもの。
 - 出力先は標準出力(Dockerのログとして見る。`docker compose logs api`)
 - 形式は`LOG_FORMAT`で切り替える。text(既定): `時刻 レベル ロガー名 メッセージ key=value ...`、json: 1行1つのJSON
 - ログを出す側は、項目を`extra`で渡す(例: `logger.info("purged", extra={"tombstones": 3})`)。リクエストの中なら

@@ -9,7 +9,7 @@ from app.routers import auth, health, sessions, users
 
 DESCRIPTION = """
 osampo-trackerの同期API。OpenAPIは実装から自動生成している。判断の理由・処理の手順は
-`backend/docs/バックエンド概要.md`の「API(共通)」と機能ごとの文書を参照(役割分担: 設計書=理由と手順、OpenAPI=入出力の型と例)。
+`backend/docs/overview.md`の「API(共通)」と機能ごとの文書を参照(役割分担: 設計書=理由と手順、OpenAPI=入出力の型と例)。
 
 - エラーは全て `{"code": ..., "message": ..., "details": [...]}` の形式で返す。クライアントは`code`で処理を分岐する
   (`details`は422のときだけ含める)
