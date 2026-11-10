@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
-# 確認コードの用途。パスワードリセット・メールアドレスの変更(11月以降)を作るときに追加する
+# 確認コードの用途。パスワードリセット・メールアドレスの変更(未実装)を作るときに追加する
 PURPOSE_VERIFY_EMAIL = "verify_email"
 
 CODE_PENDING = "pending"  # 入力待ち(期限切れかどうかはexpires_atで判定する)

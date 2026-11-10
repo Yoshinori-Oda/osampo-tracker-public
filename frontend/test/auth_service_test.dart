@@ -15,7 +15,7 @@ import 'package:test_tracking_01/providers/auth_providers.dart';
 import 'package:test_tracking_01/widgets/auth_banner_view.dart';
 
 // 認証(AuthService・AuthorizedClient)がbackend/docs/API設計ドラフト.mdの「認証のendpoints」を
-// frontend/docs/ユーザー機能追加に伴う変更予定.mdの「認証(ブロック2)」の約束どおりに呼ぶことの確認
+// frontend/docs/ユーザー機能追加に伴う変更予定.mdの「認証」の約束どおりに呼ぶことの確認
 
 const _userId = '11111111-1111-1111-1111-111111111111';
 const _baseUrl = 'http://test/api';
